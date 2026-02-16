@@ -152,7 +152,6 @@
     // ============================================
     // API CONFIGURATION
     // ============================================
-    // CHANGED: Used '/api' with leading slash to ensure it works on both localhost and Vercel
     const API_URL = '/api';
 
     const simulateLatency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
@@ -875,7 +874,7 @@
       if (step === 3) return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
           <div className="rounded-xl p-8 max-w-md w-full text-center animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)' }}>
-             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div></div>
+             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div>
             <h2 className="font-display text-2xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Payment Received!</h2>
             <p className="mb-6" style={{ color: 'var(--fg-secondary)' }}>Your property post has been sent to the admin for confirmation.</p>
             <button onClick={onClose} className="px-6 py-3 rounded-lg font-medium w-full" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Close</button>
@@ -1037,7 +1036,7 @@
       if (step === 3) return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
           <div className="rounded-xl p-8 max-w-md w-full text-center animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)' }}>
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div></div>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div>
             <h2 className="font-display text-2xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Success!</h2>
             <p className="mb-6" style={{ color: 'var(--fg-secondary)' }}>Application Submitted Successfully!</p>
             <button onClick={onClose} className="px-6 py-3 rounded-lg font-medium w-full" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Close</button>
@@ -1171,8 +1170,8 @@
               <form onSubmit={submitAd}>
                 <div className="space-y-4 mb-6">
                   <div className="flex gap-4">
-                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="mtn' checked={payment.provider === 'mtn'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-[#fbbf24] peer-checked:bg-[#fbbf24]/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-yellow-400">MTN Mobile Money</div></div></label>
-                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="airtel' checked={payment.provider === 'airtel'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-red-500 peer-checked:bg-red-500/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-red-500">Airtel Money</div></div></label>
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="mtn" checked={payment.provider === 'mtn'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-[#fbbf24] peer-checked:bg-[#fbbf24]/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-yellow-400">MTN Mobile Money</div></div></label>
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="airtel" checked={payment.provider === 'airtel'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-red-500 peer-checked:bg-red-500/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-red-500">Airtel Money</div></div></label>
                   </div>
                   <div className="p-4 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                     <p className="text-sm mb-1" style={{ color: 'var(--fg-muted)' }}>Agent Name</p><p className="font-bold text-lg" style={{ color: 'var(--fg-primary)' }}>{payment.provider === 'mtn' ? 'John Banda' : 'Mary Phiri'}</p>
@@ -1380,7 +1379,7 @@
               <div className="lg:col-span-2">
                 <div className="relative rounded-xl overflow-hidden mb-8 animate-fade-in">
                   <div className="relative h-[300px] sm:h-[450px]"><img src={property.images[currentImage]} alt={property.title} className="w-full h-full object-cover" /></div>
-                  {property.images.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2">{property.images.map((_, i) => <button key={i} onClick={() => setCurrentImage(i)} className={`flex-1 h-1.5 rounded-full transition-all focus-ring ${i === currentImage ? 'opacity-100' : 'opacity-40 hover:opacity-60'}`} style={{ backgroundColor: 'var(--fg-primary)' }} aria-label={`View image ${i + 1}`} /></div>}
+                  {property.images.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2">{property.images.map((_, i) => <button key={i} onClick={() => setCurrentImage(i)} className={`flex-1 h-1.5 rounded-full transition-all focus-ring ${i === currentImage ? 'opacity-100' : 'opacity-40 hover:opacity-60'}`} style={{ backgroundColor: 'var(--fg-primary)' }} aria-label={`View image ${i + 1}`} />)}</div>}
                   {property.featured && <div className="absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured Listing</div>}
                 </div>
                 <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
@@ -1408,7 +1407,7 @@
 
     const SearchResults = () => {
       const { searchResults, setSearchResults, isLoading, setIsLoading, lastSearch, setLastSearch, navigateTo, properties } = useApp();
-      const [hasSearched, setHasSetched] = useState(false);
+      const [hasSearched, setHasSearched] = useState(false);
       const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
 
       const handleSearch = async (filters) => {
@@ -1449,7 +1448,7 @@
               <p style={{ color: 'var(--fg-secondary)' }}>We believe everyone deserves a place they can call home. Our mission is to transform the rental experience by providing a transparent, efficient, and user-friendly platform that empowers renters to make informed decisions.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 my-10">
-              [{ number: '12K+', label: 'Active Listings' }, { number: '50+', label: 'Cities Covered' }, { number: '8K+', label: 'Happy Renters' }].map((stat, i) => <div key={i} className="text-center p-6 rounded-xl animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', animationDelay: `${0.3 + i * 0.1}s` }}><div className="font-display text-3xl font-bold mb-2" style={{ color: 'var(--accent)' }}>{stat.number}</div><div className="text-sm" style={{ color: 'var(--fg-muted)' }}>{stat.label}</div></div>)}
+              {[{ number: '12K+', label: 'Active Listings' }, { number: '50+', label: 'Cities Covered' }, { number: '8K+', label: 'Happy Renters' }].map((stat, i) => <div key={i} className="text-center p-6 rounded-xl animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', animationDelay: `${0.3 + i * 0.1}s` }}><div className="font-display text-3xl font-bold mb-2" style={{ color: 'var(--accent)' }}>{stat.number}</div><div className="text-sm" style={{ color: 'var(--fg-muted)' }}>{stat.label}</div></div>)}
             </div>
           </div>
         </div>
@@ -1504,7 +1503,7 @@
     const App = () => {
       const { currentPage } = useApp();
       return (
-        <div className="min-h-screen flex flex flex-col">
+        <div className="min-h-screen flex flex-col">
           <Header />
           <main className="flex-1">
             {currentPage === 'home' && (<><Hero /><FeaturedProperties /></>)}
