@@ -1,0 +1,270 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// --- 1. FIXED CONNECTION STRING ---
+// Vercel reads this from the Environment Variables dashboard
+const MONGO_URI = process.env.MONGO_URI; 
+
+// --- 2. OPTIMIZED CONNECTION FOR VERCEL ---
+// In serverless environments, we check if we are already connected 
+// to avoid creating too many connections.
+if (!MONGO_URI) {
+  console.error('❌ FATAL ERROR: MONGO_URI is not defined in environment variables.');
+} else {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+}
+
+// --- SCHEMAS ---
+
+// 1. Property Schema
+const propertySchema = new mongoose.Schema({
+    title: String, description: String, price: Number, bedrooms: Number, 
+    bathrooms: Number, area: Number, location: {
+        address: String, city: String, state: String, zipCode: String, coordinates: Object
+    },
+    propertyType: String, images: [String], amenities: [String], 
+    available: { type: Boolean, default: true },
+    featured: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now }
+});
+
+// 2. Job Schema
+const jobSchema = new mongoose.Schema({
+    title: String, company: String, location: String, salary: String,
+    type: String, description: String, image: String, 
+    featured: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now }
+});
+
+// 3. Pending Ad Schema (Waiting for approval)
+const pendingAdSchema = new mongoose.Schema({
+    advertiserName: String, advertiserPhone: String, advertiserEmail: String,
+    transactionId: String, amountPaid: Number, paymentDate: Date,
+    propertyData: propertySchema // Embedded Schema
+});
+
+// 4. Pending Job Schema
+const pendingJobSchema = new mongoose.Schema({
+    advertiserName: String, advertiserPhone: String,
+    transactionId: String, amountPaid: Number, paymentDate: Date,
+    jobData: jobSchema // Embedded Schema
+});
+
+// 5. Message Schema (Contact Form)
+const messageSchema = new mongoose.Schema({
+    name: String, email: String, phone: String, message: String,
+    propertyId: String, propertyTitle: String, 
+    date: { type: Date, default: Date.now }
+});
+
+// 6. Job Application Schema
+const jobApplicationSchema = new mongoose.Schema({
+    jobId: String, jobTitle: String,
+    applicant: { 
+        names: String, telephone: String, gender: String, 
+        place: String, email: String, age: String, academicLevel: String 
+    },
+    payment: { provider: String, transactionId: String },
+    date: { type: Date, default: Date.now }
+});
+
+// Create Models
+const Property = mongoose.model('Property', propertySchema);
+const Job = mongoose.model('Job', jobSchema);
+const PendingAd = mongoose.model('PendingAd', pendingAdSchema);
+const PendingJob = mongoose.model('PendingJob', pendingJobSchema);
+const Message = mongoose.model('Message', messageSchema);
+const JobApplication = mongoose.model('JobApplication', jobApplicationSchema);
+
+// --- ROUTES ---
+
+// 1. GET Data
+app.get('/api/properties', async (req, res) => {
+    try {
+        const data = await Property.find().sort({ createdAt: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/jobs', async (req, res) => {
+    try {
+        const data = await Job.find().sort({ createdAt: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/pending-ads', async (req, res) => {
+    try {
+        const data = await PendingAd.find().sort({ paymentDate: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/pending-jobs', async (req, res) => {
+    try {
+        const data = await PendingJob.find().sort({ paymentDate: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// 2. POST Data (User Actions)
+
+// A. Send Contact Message
+app.post('/api/messages', async (req, res) => {
+    try {
+        const newMessage = new Message(req.body);
+        await newMessage.save();
+        console.log(`📩 NEW MESSAGE from ${req.body.name}: ${req.body.message}`);
+        res.json({ success: true, message: 'Message sent successfully!' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// B. Submit Job Application
+app.post('/api/job-applications', async (req, res) => {
+    try {
+        const newApp = new JobApplication(req.body);
+        await newApp.save();
+        console.log(`💼 JOB APPLICATION for "${req.body.jobTitle}" by ${req.body.applicant.names}`);
+        res.json({ success: true, message: 'Application submitted!' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// C. Submit Pending Ad (User submits form)
+app.post('/api/pending-ads', async (req, res) => {
+    try {
+        const { _id, ...data } = req.body;
+        
+        if (data.paymentDate && typeof data.paymentDate === 'string') {
+            data.paymentDate = new Date(data.paymentDate);
+        }
+
+        const newPending = new PendingAd(data);
+        await newPending.save();
+        
+        console.log(`🏠 NEW PROPERTY AD SUBMITTED: ${data.propertyData.title} by ${data.advertiserName}`);
+        res.json({ success: true, message: 'Ad submitted for approval' });
+    } catch (e) {
+        console.error("Error saving pending ad:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// D. Submit Pending Job
+app.post('/api/pending-jobs', async (req, res) => {
+    try {
+        const { _id, ...data } = req.body;
+        
+        if (data.paymentDate && typeof data.paymentDate === 'string') {
+            data.paymentDate = new Date(data.paymentDate);
+        }
+
+        const newPending = new PendingJob(data);
+        await newPending.save();
+        
+        console.log(`💼 NEW JOB AD SUBMITTED: ${data.jobData.title} by ${data.advertiserName}`);
+        res.json({ success: true, message: 'Job submitted for approval' });
+    } catch (e) {
+        console.error("Error saving pending job:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// 3. Admin Actions
+
+// A. Create Property (Directly from Dashboard)
+app.post('/api/properties', async (req, res) => {
+    try {
+        const newProp = new Property(req.body);
+        await newProp.save();
+        console.log(`🏠 ADMIN CREATED: ${req.body.title}`);
+        res.json({ success: true, message: 'Property created' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// B. Delete Property
+app.delete('/api/properties/:id', async (req, res) => {
+    try {
+        await Property.findByIdAndDelete(req.params.id);
+        console.log(`🗑️ ADMIN DELETED Property ID: ${req.params.id}`);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Failed to delete' });
+    }
+});
+
+// C. Approve Ad (Move from Pending to Live)
+app.post('/api/pending-ads/:id/approve', async (req, res) => {
+    try {
+        const pending = await PendingAd.findById(req.params.id);
+        if (pending) {
+            const newPropData = pending.propertyData.toObject();
+            newPropData.available = true;
+            newPropData.createdAt = new Date();
+
+            const newProp = new Property(newPropData);
+            await newProp.save();
+            
+            await PendingAd.findByIdAndDelete(req.params.id);
+            
+            console.log(`✅ ADMIN APPROVED AD: ${newPropData.title}`);
+            res.json({ success: true, message: 'Ad Approved' });
+        } else {
+            res.status(404).json({ success: false, error: 'Pending ad not found' });
+        }
+    } catch (error) {
+        console.error("Approval Error:", error);
+        res.status(500).json({ success: false, error: 'Failed to approve' });
+    }
+});
+
+// D. Approve Job (Move from Pending to Live)
+app.post('/api/pending-jobs/:id/approve', async (req, res) => {
+    try {
+        const pending = await PendingJob.findById(req.params.id);
+        if (pending) {
+            const newJobData = pending.jobData.toObject();
+            newJobData.createdAt = new Date();
+            newJobData.featured = false;
+
+            const newJob = new Job(newJobData);
+            await newJob.save();
+            
+            await PendingJob.findByIdAndDelete(req.params.id);
+            
+            console.log(`✅ ADMIN APPROVED JOB: ${newJobData.title}`);
+            res.json({ success: true, message: 'Job Approved' });
+        } else {
+            res.status(404).json({ success: false, error: 'Pending job not found' });
+        }
+    } catch (error) {
+        console.error("Approval Error:", error);
+        res.status(500).json({ success: false, error: 'Failed to approve' });
+    }
+});
+
+// --- 3. CRITICAL: EXPORT APP FOR VERCEL ---
+// Do NOT use app.listen() here. Vercel handles the server startup.
+module.exports = app;

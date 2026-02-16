@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H&JNest - Find Your Perfect Rental & Job</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0f0f0f;
+      --bg-secondary: #1a1a1a;
+      --bg-card: #242424;
+      --fg-primary: #f5f5f5;
+      --fg-secondary: #a0a0a0;
+      --fg-muted: #6b6b6b;
+      --accen: #c9a55c;
+      --accent-hover: #BBCB2E;
+      --accent-hove: #dbb86e;
+      --accent: #839705;
+      --border: #333333;
+      --success: #0ff12e;
+      --error: #fc1010;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--fg-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .font-display {
+      font-family: 'Playfair Display', serif;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--fg-muted);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .animate-fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .animate-slide-in-right {
+      animation: slideInRight 0.5s ease-out forwards;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+    .stagger-4 { animation-delay: 0.4s; }
+
+    /* Gradient backgrounds */
+    .hero-gradient {
+      background: linear-gradient(135deg, rgba(201, 165, 92, 0.1) 0%, transparent 50%),
+                  linear-gradient(225deg, rgba(201, 165, 92, 0.05) 0%, transparent 50%);
+    }
+
+    .card-shimmer {
+      background: linear-gradient(90deg, var(--bg-card) 25%, #2a2a2a 50%, var(--bg-card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Focus styles */
+    .focus-ring:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent);
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo, useRef, createContext, useContext } = React;
+
+    // ============================================
+    // API CONFIGURATION
+    // ============================================
+    // CHANGED: Used '/api' with leading slash to ensure it works on both localhost and Vercel
+    const API_URL = '/api';
+
+    const simulateLatency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const api = {
+      // SEARCH: Filters properties locally (kept for performance, using DB data as source)
+      async searchProperties(filters = {}, allProperties) {
+        await simulateLatency(400);
+        let results = [...allProperties];
+        
+        if (filters.location && filters.location.trim()) {
+          const searchTerm = filters.location.toLowerCase().trim();
+          results = results.filter(p => 
+            p.location.city.toLowerCase().includes(searchTerm) ||
+            p.location.state.toLowerCase().includes(searchTerm) ||
+            p.location.address.toLowerCase().includes(searchTerm)
+          );
+        }
+        
+        if (filters.minPrice !== undefined && filters.minPrice !== '') {
+          results = results.filter(p => p.price >= Number(filters.minPrice));
+        }
+        if (filters.maxPrice !== undefined && filters.maxPrice !== '') {
+          results = results.filter(p => p.price <= Number(filters.maxPrice));
+        }
+        
+        if (filters.bedrooms !== undefined && filters.bedrooms !== '' && filters.bedrooms !== 'any') {
+          const beds = Number(filters.bedrooms);
+          if (beds === 4) {
+            results = results.filter(p => p.bedrooms >= 4);
+          } else {
+            results = results.filter(p => p.bedrooms === beds);
+          }
+        }
+        
+        if (filters.propertyType && filters.propertyType !== 'any') {
+          results = results.filter(p => p.propertyType === filters.propertyType);
+        }
+        
+        results = results.filter(p => p.available);
+        results.sort((a, b) => {
+          if (a.featured && !b.featured) return -1;
+          if (!a.featured && b.featured) return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        
+        return { success: true, count: results.length, data: results };
+      },
+      
+      async getProperty(id, allProperties) {
+        await simulateLatency(200);
+        const property = allProperties.find(p => p._id === id);
+        if (!property) return { success: false, error: 'Property not found' };
+        return { success: true, data: property };
+      },
+      
+      async getFeatured(allProperties) {
+        await simulateLatency(300);
+        const featured = allProperties.filter(p => p.featured && p.available);
+        return { success: true, count: featured.length, data: featured };
+      },
+
+      // --- BACKEND CONNECTED CALLS ---
+
+      // Send Contact Message
+      async submitContact(data) {
+        try {
+            const response = await fetch(`${API_URL}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch(e) {
+            return { success: false, error: 'Failed to send message' };
+        }
+      },
+
+      // Submit Job Application
+      async submitJobApplication(data) {
+        try {
+            const response = await fetch(`${API_URL}/job-applications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch(e) {
+            return { success: false, error: 'Failed to submit application' };
+        }
+      },
+
+      // ADMIN: Create Property
+      async createProperty(data) {
+        try {
+            const response = await fetch(`${API_URL}/properties`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: 'Server error' };
+        }
+      },
+
+      // ADMIN: Delete Property
+      async deleteProperty(id) {
+        try {
+            await fetch(`${API_URL}/properties/${id}`, { method: 'DELETE' });
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: 'Failed to delete' };
+        }
+      },
+
+      // ADMIN: Approve Ad
+      async approveAd(id) {
+        try {
+            const response = await fetch(`${API_URL}/pending-ads/${id}/approve`, {
+                method: 'POST'
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: 'Failed to approve' };
+        }
+      },
+
+      // ADMIN: Approve Job
+      async approveJob(id) {
+        try {
+            const response = await fetch(`${API_URL}/pending-jobs/${id}/approve`, {
+                method: 'POST'
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: 'Failed to approve' };
+        }
+      },
+
+      // USER: Submit Pending Ad
+      async submitPendingAd(data) {
+        try {
+            const response = await fetch(`${API_URL}/pending-ads`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: 'Server error' };
+        }
+      },
+
+      // USER: Submit Pending Job
+      async submitPendingJob(data) {
+        try {
+            const response = await fetch(`${API_URL}/pending-jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: 'Server error' };
+        }
+      }
+    };
+
+    // ============================================
+    // CONTEXT
+    // ============================================
+    const AppContext = createContext();
+
+    const AppProvider = ({ children }) => {
+      const [currentPage, setCurrentPage] = useState('home');
+      const [selectedProperty, setSelectedProperty] = useState(null);
+      const [searchResults, setSearchResults] = useState([]);
+      const [lastSearch, setLastSearch] = useState(null);
+      const [isLoading, setIsLoading] = useState(true); // Start loading true
+      
+      // Admin State
+      const [adminLoggedIn, setAdminLoggedIn] = useState(false);
+      // MODIFIED: Start with empty arrays, data comes from DB
+      const [properties, setProperties] = useState([]);
+      const [pendingAds, setPendingAds] = useState([]);
+      
+      // --- MODIFIED: Added Jobs State for Admin Workflow ---
+      const [jobs, setJobs] = useState([]);
+      const [pendingJobs, setPendingJobs] = useState([]);
+
+      // MODIFIED: Function to refresh data from MongoDB DB
+      const refreshData = useCallback(async () => {
+          setIsLoading(true);
+          try {
+              const [propsRes, adsRes, jobsRes, pendingJobsRes] = await Promise.all([
+                  fetch(`${API_URL}/properties`),
+                  fetch(`${API_URL}/pending-ads`),
+                  fetch(`${API_URL}/jobs`),
+                  fetch(`${API_URL}/pending-jobs`)
+              ]);
+
+              const props = await propsRes.json();
+              const ads = await adsRes.json();
+              const jobsList = await jobsRes.json();
+              const pJobs = await pendingJobsRes.json();
+
+              setProperties(props);
+              setPendingAds(ads);
+              setJobs(jobsList);
+              setPendingJobs(pJobs);
+          } catch (error) {
+              console.error("Failed to fetch data. Is server running?", error);
+          } finally {
+              setIsLoading(false);
+          }
+      }, []);
+
+      // Load data on mount
+      useEffect(() => {
+          refreshData();
+      }, [refreshData]);
+
+      const navigateTo = (page, data = null) => {
+        setCurrentPage(page);
+        if (data) setSelectedProperty(data);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      return (
+        <AppContext.Provider value={{
+          currentPage, setCurrentPage,
+          selectedProperty, setSelectedProperty,
+          searchResults, setSearchResults,
+          lastSearch, setLastSearch,
+          isLoading, setIsLoading,
+          navigateTo,
+          // Admin Props
+          adminLoggedIn, setAdminLoggedIn,
+          properties, setProperties,
+          pendingAds, setPendingAds,
+          // Job Props
+          jobs, setJobs,
+          pendingJobs, setPendingJobs,
+          refreshData // Expose refresh to components
+        }}>
+          {children}
+        </AppContext.Provider>
+      );
+    };
+
+    const useApp = () => useContext(AppContext);
+
+    // ============================================
+    // ICONS
+    // ============================================
+    const Icons = {
+      Search: () => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+      ),
+      Bed: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+      ),
+      Bath: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+      ),
+      Area: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+      ),
+      Location: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+      ),
+      Arrow: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      ),
+      Close: () => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+      ),
+      Check: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+      ),
+      Phone: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+      ),
+      Mail: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+      ),
+      Home: () => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+      ),
+      Info: () => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      ),
+      Briefcase: () => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+      ),
+      Star: () => (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      ),
+      Trash: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+      ),
+      Edit: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+      ),
+      Logout: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+      )
+    };
+
+    // ============================================
+    // ADMIN COMPONENTS
+    // ============================================
+
+    const AdminLogin = () => {
+      const { setAdminLoggedIn, navigateTo } = useApp();
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (username === 'admin' && password === 'admin') {
+          setAdminLoggedIn(true);
+          navigateTo('admin-dashboard');
+        } else {
+          setError('Invalid credentials. Try admin/admin');
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="max-w-md w-full p-8 rounded-xl animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <h2 className="font-display text-2xl font-bold mb-6 text-center" style={{ color: 'var(--fg-primary)' }}>Admin Login</h2>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Username</label>
+                <input 
+                  type="text" 
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg focus-ring"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--fg-primary)' }}
+                  placeholder="Enter username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Password</label>
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg focus-ring"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--fg-primary)' }}
+                  placeholder="Enter password"
+                />
+              </div>
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+              <button type="submit" className="w-full py-3 rounded-lg font-semibold transition-all hover:scale-105" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>
+                Log In
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
+    const AdminDashboard = () => {
+      const { navigateTo, setAdminLoggedIn, properties, setProperties, pendingAds, setPendingAds, pendingJobs, setPendingJobs, jobs, setJobs, refreshData } = useApp();
+      const [activeTab, setActiveTab] = useState('ads'); // 'ads', 'manage', 'create', 'pending-jobs'
+      const [editingProperty, setEditingProperty] = useState(null);
+      
+      // Form state for Create/Edit
+      const [formData, setFormData] = useState({
+        title: '', description: '', price: '', bedrooms: '', bathrooms: '', area: '',
+        city: '', state: '', address: '', propertyType: 'apartment', image: ''
+      });
+
+      // Reset form
+      const resetForm = () => {
+        setFormData({
+          title: '', description: '', price: '', bedrooms: '', bathrooms: '', area: '',
+          city: '', state: '', address: '', propertyType: 'apartment', image: ''
+        });
+        setEditingProperty(null);
+      };
+
+      const handleEditClick = (prop) => {
+        setEditingProperty(prop);
+        setFormData({
+          title: prop.title,
+          description: prop.description,
+          price: prop.price,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          area: prop.area,
+          city: prop.location.city,
+          state: prop.location.state,
+          address: prop.location.address,
+          propertyType: prop.propertyType,
+          image: prop.images[0]
+        });
+        setActiveTab('create'); // Switch to form view
+      };
+
+      const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this post?')) {
+            await api.deleteProperty(id);
+            refreshData();
+        }
+      };
+
+      const handleApproveAd = async (request) => {
+        if (window.confirm(`Confirm payment for ${request.advertiserName}?`)) {
+            await api.approveAd(request._id);
+            alert('Post Confirmed and Uploaded!');
+            refreshData();
+        }
+      };
+
+      const handleApproveJob = async (request) => {
+        if (window.confirm(`Confirm payment for job "${request.jobData.title}"?`)) {
+            await api.approveJob(request._id);
+            alert('Job Confirmed and Uploaded!');
+            refreshData();
+        }
+      };
+
+      const handleSaveProperty = async (e) => {
+        e.preventDefault();
+        
+        const newProp = {
+          title: formData.title,
+          description: formData.description,
+          price: Number(formData.price),
+          bedrooms: Number(formData.bedrooms),
+          bathrooms: Number(formData.bathrooms),
+          area: Number(formData.area),
+          location: {
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zipCode: '00000',
+            coordinates: {}
+          },
+          propertyType: formData.propertyType,
+          images: [formData.image || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'],
+          amenities: ['Parking', 'Security'], // Default
+          available: true,
+          featured: false,
+          createdAt: new Date()
+        };
+
+        if (editingProperty) {
+            alert("Update feature not implemented in DB version yet.");
+        } 
+        
+        await api.createProperty(newProp);
+        alert('Post Created!');
+        resetForm();
+        setActiveTab('manage');
+        refreshData();
+      };
+
+      return (
+        <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+              <h1 className="font-display text-3xl font-bold" style={{ color: 'var(--fg-primary)' }}>Admin Dashboard</h1>
+              <button 
+                onClick={() => { setAdminLoggedIn(false); navigateTo('home'); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
+                style={{ backgroundColor: 'rgba(248, 113, 113, 0.2)', color: 'var(--error)' }}
+              >
+                <Icons.Logout /> Log Out
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+              {[
+                { id: 'ads', label: `Prop. Ads (${pendingAds.length})` },
+                { id: 'pending-jobs', label: `Job Ads (${pendingJobs.length})` },
+                { id: 'manage', label: `Manage Posts (${properties.length})` },
+                { id: 'create', label: editingProperty ? 'Edit Post' : 'Add New Post' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setActiveTab(tab.id); if(tab.id === 'create' && !editingProperty) resetForm(); }}
+                  className={`px-5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id ? 'shadow-lg' : 'opacity-60 hover:opacity-100'
+                  }`}
+                  style={{
+                    backgroundColor: activeTab === tab.id ? 'var(--accent)' : 'var(--bg-card)',
+                    color: activeTab === tab.id ? 'var(--bg-primary)' : 'var(--fg-secondary)',
+                    border: activeTab === tab.id ? 'none' : '1px solid var(--border)'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content Area */}
+            <div className="rounded-xl p-6 min-h-[500px]" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              
+              {/* TAB 1: Pending Approvals (Properties) */}
+              {activeTab === 'ads' && (
+                <div className="space-y-4">
+                  {pendingAds.length === 0 ? (
+                    <div className="text-center py-10" style={{ color: 'var(--fg-muted)' }}>No pending approvals.</div>
+                  ) : (
+                    pendingAds.map(req => (
+                      <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{req.propertyData.title}</h3>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-2 text-sm" style={{ color: 'var(--fg-secondary)' }}>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Advertiser:</span> {req.advertiserName}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Phone:</span> {req.advertiserPhone}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Email:</span> {req.advertiserEmail}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Trans ID:</span> {req.transactionId}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Amount:</span> K{req.amountPaid}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                          <button 
+                            onClick={() => handleApproveAd(req)}
+                            className="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105"
+                            style={{ backgroundColor: 'var(--success)', color: '#000' }}
+                          >
+                            <Icons.Check /> Confirm
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: Pending Job Approvals */}
+              {activeTab === 'pending-jobs' && (
+                <div className="space-y-4">
+                  {pendingJobs.length === 0 ? (
+                    <div className="text-center py-10" style={{ color: 'var(--fg-muted)' }}>No pending job approvals.</div>
+                  ) : (
+                    pendingJobs.map(req => (
+                      <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{req.jobData.title}</h3>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-2 text-sm" style={{ color: 'var(--fg-secondary)' }}>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Company:</span> {req.jobData.company}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Advertiser:</span> {req.advertiserName}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Phone:</span> {req.advertiserPhone}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Trans ID:</span> {req.transactionId}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Amount:</span> K{req.amountPaid}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                          <button 
+                            onClick={() => handleApproveJob(req)}
+                            className="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105"
+                            style={{ backgroundColor: 'var(--success)', color: '#000' }}
+                          >
+                            <Icons.Check /> Confirm Job
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: Manage Posts */}
+              {activeTab === 'manage' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--fg-muted)' }}>
+                        <th className="pb-3 pl-2">Title</th>
+                        <th className="pb-3">Price</th>
+                        <th className="pb-3">Location</th>
+                        <th className="pb-3">Type</th>
+                        <th className="pb-3 text-right pr-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {properties.map(prop => (
+                        <tr key={prop._id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-secondary)] transition-colors">
+                          <td className="py-3 pl-2 font-medium" style={{ color: 'var(--fg-primary)' }}>{prop.title}</td>
+                          <td className="py-3" style={{ color: 'var(--accent)' }}>K{prop.price.toLocaleString()}</td>
+                          <td className="py-3" style={{ color: 'var(--fg-secondary)' }}>{prop.location.city}, {prop.location.state}</td>
+                          <td className="py-3 capitalize" style={{ color: 'var(--fg-secondary)' }}>{prop.propertyType}</td>
+                          <td className="py-3 text-right pr-2 flex justify-end gap-2">
+                            <button onClick={() => handleEditClick(prop)} className="p-2 rounded hover:bg-[var(--bg-card)] text-blue-400" title="Edit"><Icons.Edit /></button>
+                            <button onClick={() => handleDelete(prop._id)} className="p-2 rounded hover:bg-[var(--bg-card)] text-red-400" title="Delete"><Icons.Trash /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* TAB 4: Create/Edit Form */}
+              {activeTab === 'create' && (
+                <form onSubmit={handleSaveProperty} className="max-w-2xl mx-auto space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Property Title</label>
+                      <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Property Type</label>
+                      <select value={formData.propertyType} onChange={e => setFormData({...formData, propertyType: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]">
+                        <option value="apartment">Apartment</option>
+                        <option value="house">House</option>
+                        <option value="condo">Condo</option>
+                        <option value="studio">Studio</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Price (K)</label>
+                      <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Area (sqft)</label>
+                      <input required type="number" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Bedrooms</label>
+                      <input required type="number" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Bathrooms</label>
+                      <input required type="number" step="0.5" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>City</label>
+                      <input required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>State/Province</label>
+                      <input required value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Address</label>
+                    <input required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Image URL</label>
+                    <input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Description</label>
+                    <textarea required rows="4" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)] resize-none"></textarea>
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => { resetForm(); setActiveTab('manage'); }} className="px-6 py-2 rounded-lg text-sm font-medium bg-[var(--bg-secondary)] text-[var(--fg-secondary)] border border-[var(--border)]">Cancel</button>
+                    <button type="submit" className="flex-1 px-6 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>
+                      {editingProperty ? 'Update Post' : 'Upload Post'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // ADVERTISE PROPERTY MODAL
+    // ============================================
+    const AdvertisePropertyModal = ({ onClose }) => {
+      const [step, setStep] = useState(1);
+      const [formData, setFormData] = useState({ 
+        advertiserName: '', advertiserPhone: '', advertiserEmail: '',
+        title: '', description: '', price: '', city: '', image: '' 
+      });
+      const [payment, setPayment] = useState({ provider: 'mtn', transactionId: '' });
+      const [loading, setLoading] = useState(false);
+
+      const submitAd = async (e) => {
+        e.preventDefault(); 
+        setLoading(true);
+
+        const newRequest = {
+          _id: 'req_' + Date.now(),
+          advertiserName: formData.advertiserName,
+          advertiserPhone: formData.advertiserPhone,
+          advertiserEmail: formData.advertiserEmail,
+          transactionId: payment.transactionId,
+          amountPaid: 100,
+          paymentDate: new Date(),
+          propertyData: {
+            title: formData.title,
+            description: formData.description,
+            location: { address: 'Address Provided by User', city: formData.city, state: 'Unknown', zipCode: '00000', coordinates: {} },
+            price: Number(formData.price),
+            bedrooms: 2,
+            bathrooms: 1,
+            area: 1000,
+            propertyType: 'apartment',
+            amenities: [],
+            images: [formData.image || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'],
+            featured: false,
+            available: true
+          }
+        };
+
+        // Call Backend API
+        await api.submitPendingAd(newRequest);
+        
+        setLoading(false); 
+        setStep(3);
+      };
+
+      if (step === 3) return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-8 max-w-md w-full text-center animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)' }}>
+             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div></div>
+            <h2 className="font-display text-2xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Payment Received!</h2>
+            <p className="mb-6" style={{ color: 'var(--fg-secondary)' }}>Your property post has been sent to the admin for confirmation.</p>
+            <button onClick={onClose} className="px-6 py-3 rounded-lg font-medium w-full" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Close</button>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-6 max-w-lg w-full my-8 animate-fade-in-up relative" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10"><Icons.Close /></button>
+            <h2 className="font-display text-2xl font-bold mb-1" style={{ color: 'var(--fg-primary)' }}>{step === 1 ? 'Post a Property' : 'Pay for Listing'}</h2>
+            
+            {step === 1 ? (
+              <form onSubmit={(e) => { e.preventDefault(); setStep(2); }}>
+                <div className="space-y-4">
+                  <h3 className="text-xs uppercase tracking-wider font-bold mb-2" style={{ color: 'var(--fg-muted)' }}>Your Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Your Name</label><input required value={formData.advertiserName} onChange={e => setFormData({...formData, advertiserName: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                     <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Phone Number</label><input required value={formData.advertiserPhone} onChange={e => setFormData({...formData, advertiserPhone: e.target.value})} type="tel" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Email Address</label><input required value={formData.advertiserEmail} onChange={e => setFormData({...formData, advertiserEmail: e.target.value})} type="email" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  
+                  <h3 className="text-xs uppercase tracking-wider font-bold mb-2 mt-4" style={{ color: 'var(--fg-muted)' }}>Property Details</h3>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Property Title</label><input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} placeholder="e.g. 2 Bedroom Apartment" /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Price (K)</label><input required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} type="number" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>City</label><input required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Description</label><textarea required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows="3" className="w-full px-4 py-3 rounded-lg text-sm focus-ring resize-none" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}></textarea></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Image URL</label><input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} type="url" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} placeholder="https://..." /></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Proceed to Payment</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={submitAd}>
+                <div className="space-y-4 mb-6">
+                  <div className="flex gap-4">
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="mtn" checked={payment.provider === 'mtn'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-[#fbbf24] peer-checked:bg-[#fbbf24]/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-yellow-400">MTN Mobile Money</div></div></label>
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="airtel" checked={payment.provider === 'airtel'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-red-500 peer-checked:bg-red-500/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-red-500">Airtel Money</div></div></label>
+                  </div>
+                  <div className="p-4 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    <p className="text-sm mb-1" style={{ color: 'var(--fg-muted)' }}>Agent Name</p><p className="font-bold text-lg" style={{ color: 'var(--fg-primary)' }}>{payment.provider === 'mtn' ? 'John Banda' : 'Mary Phiri'}</p>
+                    <p className="text-sm mb-1 mt-2" style={{ color: 'var(--fg-muted)' }}>Agent Number</p><p className="font-mono text-xl font-bold" style={{ color: 'var(--accent)' }}>{payment.provider === 'mtn' ? '0976 123 456' : '0977 987 654'}</p>
+                    <p className="text-xs mt-2 text-[#4ade80]">Amount: K100 (Posting Fee)</p>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Transaction ID</label><input required name="transactionId" value={payment.transactionId} onChange={e => setPayment({...payment, transactionId: e.target.value})} type="text" placeholder="e.g. 1234567890" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={() => setStep(1)} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Back</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105 disabled:opacity-50" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>{loading ? 'Confirming...' : 'Confirm & Post'}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // EXISTING COMPONENTS (Unchanged core logic)
+    // ============================================
+
+    const PropertySkeleton = () => (
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="h-56 card-shimmer"></div>
+        <div className="p-5">
+          <div className="h-6 rounded card-shimmer mb-3 w-3/4"></div>
+          <div className="h-4 rounded card-shimmer mb-4 w-1/2"></div>
+          <div className="flex gap-4 mb-4">
+            <div className="h-4 rounded card-shimmer w-16"></div>
+            <div className="h-4 rounded card-shimmer w-16"></div>
+            <div className="h-4 rounded card-shimmer w-20"></div>
+          </div>
+          <div className="h-8 rounded card-shimmer w-1/3"></div>
+        </div>
+      </div>
+    );
+
+    const Header = () => {
+      const { currentPage, navigateTo, adminLoggedIn, setAdminLoggedIn } = useApp();
+      const [scrolled, setScrolled] = useState(false);
+
+      useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 50);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+      }, []);
+
+      return (
+        <header 
+          className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${scrolled ? 'py-3' : 'py-5'}`}
+          style={{ backgroundColor: scrolled ? 'rgba(15, 15, 15, 0.95)' : 'transparent', backdropFilter: scrolled ? 'blur(10px)' : 'none', borderBottom: scrolled ? '1px solid var(--border)' : 'none' }}
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between">
+              <button onClick={() => navigateTo('home')} className="flex items-center gap-2 focus-ring rounded">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent)' }}>
+                  <span className="font-display text-xl font-bold" style={{ color: 'var(--bg-primary)' }}>H</span>
+                </div>
+                <span className="font-display text-xl font-semibold" style={{ color: 'var(--fg-primary)' }}>H&JNest</span>
+              </button>
+
+              <nav className="hidden md:flex items-center gap-8">
+                <button onClick={() => navigateTo('home')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'Home' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Home</button>
+                <button onClick={() => navigateTo('search')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'Search' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Browse</button>
+                <button onClick={() => navigateTo('about')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'AboutUs' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>About</button>
+                <button onClick={() => navigateTo('jobs')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'Jobs' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Jobs</button>
+              </nav>
+
+              <div className="flex items-center gap-4">
+                {!adminLoggedIn ? (
+                  <button onClick={() => navigateTo('login')} className="text-sm font-medium px-4 py-2 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-card)] transition-colors" style={{ color: 'var(--fg-primary)' }}>Log In</button>
+                ) : (
+                  <button onClick={() => navigateTo('admin-dashboard')} className="text-sm font-medium px-4 py-2 rounded-lg transition-colors" style={{ color: 'var(--accent)' }}>Dashboard</button>
+                )}
+                <button onClick={() => navigateTo('search')} className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>
+                  <Icons.Search /> Find Homes
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+      );
+    };
+
+    const JobCard = ({ job, onApply }) => (
+      <article className="group rounded-xl overflow-hidden transition-all duration-300 hover:translate-y-[-4px] animate-fade-in-up flex flex-col h-full" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="relative h-48 overflow-hidden">
+          <img src={job.image} alt={job.title} className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110" />
+          {job.featured && <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}><Icons.Star /> Featured</div>}
+        </div>
+        <div className="p-5 flex-1 flex flex-col">
+          <h3 className="font-display text-xl font-semibold group-hover:text-[#c9a55c] transition-colors" style={{ color: 'var(--fg-primary)' }}>{job.title}</h3>
+          <p className="text-sm mb-4 flex-1" style={{ color: 'var(--fg-secondary)' }}>{job.company} • {job.location}</p>
+          <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <span className="font-display text-lg font-bold" style={{ color: 'var(--accent)' }}>{job.salary}</span>
+            <button onClick={() => onApply(job)} className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}>Apply Now</button>
+          </div>
+        </div>
+      </article>
+    );
+
+    const JobApplicationModal = ({ job, onClose }) => {
+      const [step, setStep] = useState(1);
+      const [formData, setFormData] = useState({ names: '', telephone: '', gender: '', place: '', email: '', age: '', academicLevel: '' });
+      const [payment, setPayment] = useState({ provider: 'mtn', transactionId: '' });
+      const [loading, setLoading] = useState(false);
+
+      const submitApplication = async (e) => {
+        e.preventDefault(); setLoading(true);
+        await api.submitJobApplication({ jobId: job._id, applicant: formData, payment });
+        setLoading(false); setStep(3);
+      };
+
+      if (step === 3) return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-8 max-w-md w-full text-center animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div></div>
+            <h2 className="font-display text-2xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Success!</h2>
+            <p className="mb-6" style={{ color: 'var(--fg-secondary)' }}>Application Submitted Successfully!</p>
+            <button onClick={onClose} className="px-6 py-3 rounded-lg font-medium w-full" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Close</button>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-6 max-w-lg w-full my-8 animate-fade-in-up relative" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10"><Icons.Close /></button>
+            <h2 className="font-display text-2xl font-bold mb-1" style={{ color: 'var(--fg-primary)' }}>{step === 1 ? 'Apply for Job' : 'Payment Details'}</h2>
+            
+            {step === 1 ? (
+              <form onSubmit={(e) => { e.preventDefault(); setStep(2); }}>
+                <div className="space-y-4">
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Full Names</label><input required name="names" value={formData.names} onChange={e => setFormData({...formData, names: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Telephone</label><input required name="telephone" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} type="tel" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Age</label><input required name="age" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} type="number" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Gender</label><select required name="gender" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Academic Level</label><select required name="academicLevel" value={formData.academicLevel} onChange={e => setFormData({...formData, academicLevel: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">Select</option><option value="Grade 12">Grade 12</option><option value="Degree">Degree</option></select></div>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Place/Location</label><input required name="place" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Email Address</label><input required name="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Proceed to Payment</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={submitApplication}>
+                <div className="space-y-4 mb-6">
+                  <div className="flex gap-4">
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="mtn" checked={payment.provider === 'mtn'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-[#fbbf24] peer-checked:bg-[#fbbf24]/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-yellow-400">MTN Mobile Money</div></div></label>
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="airtel" checked={payment.provider === 'airtel'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-red-500 peer-checked:bg-red-500/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-red-500">Airtel Money</div></div></label>
+                  </div>
+                  <div className="p-4 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    <p className="text-sm mb-1" style={{ color: 'var(--fg-muted)' }}>Agent Name</p><p className="font-bold text-lg" style={{ color: 'var(--fg-primary)' }}>{payment.provider === 'mtn' ? 'John Banda' : 'Mary Phiri'}</p>
+                    <p className="text-sm mb-1 mt-2" style={{ color: 'var(--fg-muted)' }}>Agent Number</p><p className="font-mono text-xl font-bold" style={{ color: 'var(--accent)' }}>{payment.provider === 'mtn' ? '0976 123 456' : '0977 987 654'}</p>
+                    <p className="text-xs mt-2 text-[#4ade80]">Amount: K50 (Application Fee)</p>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Transaction ID</label><input required name="transactionId" value={payment.transactionId} onChange={e => setPayment({...payment, transactionId: e.target.value})} type="text" placeholder="e.g. 1234567890" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={() => setStep(1)} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Back</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105 disabled:opacity-50" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>{loading ? 'Confirming...' : 'Confirm & Apply'}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const AdvertiseJobModal = ({ onClose }) => {
+      const [step, setStep] = useState(1);
+      const [jobInfo, setJobInfo] = useState({ title: '', description: '', company: '', location: '', salary: '' });
+      const [advertiserInfo, setAdvertiserInfo] = useState({ name: '', phone: '' });
+      const [payment, setPayment] = useState({ provider: 'mtn', transactionId: '' });
+      const [loading, setLoading] = useState(false);
+
+      const submitAd = async (e) => {
+        e.preventDefault(); 
+        setLoading(true);
+
+        const newJobRequest = {
+          _id: 'job_req_' + Date.now(),
+          advertiserName: advertiserInfo.name,
+          advertiserPhone: advertiserInfo.phone,
+          transactionId: payment.transactionId,
+          amountPaid: 100,
+          paymentDate: new Date(),
+          jobData: {
+            title: jobInfo.title,
+            company: jobInfo.company,
+            location: jobInfo.location || 'Remote',
+            salary: jobInfo.salary || 'Negotiable',
+            type: 'Full-time',
+            description: jobInfo.description,
+            image: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800',
+            featured: false
+          }
+        };
+
+        await api.submitPendingJob(newJobRequest);
+        
+        setLoading(false); 
+        setStep(3);
+      };
+
+      if (step === 3) return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-8 max-w-md w-full text-center animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)' }}>
+             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', color: 'var(--success)' }}><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg></div>
+            <h2 className="font-display text-2xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Payment Received!</h2>
+            <p className="mb-6" style={{ color: 'var(--fg-secondary)' }}>Your job post has been sent to the admin for confirmation.</p>
+            <button onClick={onClose} className="px-6 py-3 rounded-lg font-medium w-full" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Close</button>
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+          <div className="rounded-xl p-6 max-w-lg w-full my-8 animate-fade-in-up relative" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10"><Icons.Close /></button>
+            <h2 className="font-display text-2xl font-bold mb-1" style={{ color: 'var(--fg-primary)' }}>{step === 1 ? 'Post a Job' : 'Pay for Posting'}</h2>
+            
+            {step === 1 ? (
+              <form onSubmit={(e) => { e.preventDefault(); setStep(2); }}>
+                <div className="space-y-4">
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Your Name</label><input required value={advertiserInfo.name} onChange={e => setAdvertiserInfo({...advertiserInfo, name: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Phone Number</label><input required value={advertiserInfo.phone} onChange={e => setAdvertiserInfo({...advertiserInfo, phone: e.target.value})} type="tel" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Job Title</label><input required name="title" value={jobInfo.title} onChange={e => setJobInfo({...jobInfo, title: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Company Name</label><input required name="company" value={jobInfo.company} onChange={e => setJobInfo({...jobInfo, company: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Location</label><input name="location" value={jobInfo.location} onChange={e => setJobInfo({...jobInfo, location: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Salary</label><input name="salary" value={jobInfo.salary} onChange={e => setJobInfo({...jobInfo, salary: e.target.value})} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Description</label><textarea required name="description" value={jobInfo.description} onChange={e => setJobInfo({...jobInfo, description: e.target.value})} rows="3" className="w-full px-4 py-3 rounded-lg text-sm focus-ring resize-none" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}></textarea></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Proceed to Payment</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={submitAd}>
+                <div className="space-y-4 mb-6">
+                  <div className="flex gap-4">
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="mtn' checked={payment.provider === 'mtn'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-[#fbbf24] peer-checked:bg-[#fbbf24]/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-yellow-400">MTN Mobile Money</div></div></label>
+                    <label className="flex-1 cursor-pointer"><input type="radio" name="provider" value="airtel' checked={payment.provider === 'airtel'} onChange={e => setPayment({...payment, provider: e.target.value})} className="peer sr-only" /><div className="p-4 rounded-lg border-2 text-center peer-checked:border-red-500 peer-checked:bg-red-500/10 transition-all" style={{ borderColor: 'var(--border)' }}><div className="font-bold text-red-500">Airtel Money</div></div></label>
+                  </div>
+                  <div className="p-4 rounded-lg text-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    <p className="text-sm mb-1" style={{ color: 'var(--fg-muted)' }}>Agent Name</p><p className="font-bold text-lg" style={{ color: 'var(--fg-primary)' }}>{payment.provider === 'mtn' ? 'John Banda' : 'Mary Phiri'}</p>
+                    <p className="text-sm mb-1 mt-2" style={{ color: 'var(--fg-muted)' }}>Agent Number</p><p className="font-mono text-xl font-bold" style={{ color: 'var(--accent)' }}>{payment.provider === 'mtn' ? '0976 123 456' : '0977 987 654'}</p>
+                    <p className="text-xs mt-2 text-[#4ade80]">Amount: K100 (Posting Fee)</p>
+                  </div>
+                  <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Transaction ID</label><input required name="transactionId" value={payment.transactionId} onChange={e => setPayment({...payment, transactionId: e.target.value})} type="text" placeholder="e.g. 1234567890" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button type="button" onClick={() => setStep(1)} className="flex-1 px-4 py-3 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>Back</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-3 rounded-lg font-semibold text-sm transition-all hover:scale-105 disabled:opacity-50" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>{loading ? 'Confirming...' : 'Confirm & Post'}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const JobsPage = () => {
+      const { jobs } = useApp();
+      const [selectedJob, setSelectedJob] = useState(null);
+      const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
+      return (
+        <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+              <div>
+                <h1 className="font-display text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Find Your Dream Job</h1>
+                <p className="text-base" style={{ color: 'var(--fg-secondary)' }}>Apply for the latest openings or advertise a vacancy.</p>
+              </div>
+              <button onClick={() => setShowAdvertiseModal(true)} className="px-6 py-3 rounded-lg font-medium text-sm transition-all hover:scale-105 focus-ring flex items-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg> Advertise Job</button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{jobs.map((job, index) => <JobCard key={job._id} job={job} onApply={setSelectedJob} />)}</div>
+          </div>
+          {selectedJob && <JobApplicationModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
+          {showAdvertiseModal && <AdvertiseJobModal onClose={() => setShowAdvertiseModal(false)} />}
+        </div>
+      );
+    };
+
+    const SearchBar = ({ variant = 'hero', onSearch, initialValues = {} }) => {
+      const [location, setLocation] = useState(initialValues.location || '');
+      const [minPrice, setMinPrice] = useState(initialValues.minPrice || '');
+      const [maxPrice, setMaxPrice] = useState(initialValues.maxPrice || '');
+      const [bedrooms, setBedrooms] = useState(initialValues.bedrooms || 'any');
+
+      const handleSearch = async (e) => {
+        e.preventDefault();
+        if (onSearch) onSearch({ location, minPrice, maxPrice, bedrooms });
+      };
+
+      const isHero = variant === 'hero';
+
+      return (
+        <form onSubmit={handleSearch} className={`w-full ${isHero ? 'max-w-4xl mx-auto' : ''}`}>
+          <div className={`rounded-2xl ${isHero ? 'p-6 sm:p-8' : 'p-4 sm:p-5'}`} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="relative">
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--fg-muted)' }}>Location</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--fg-muted)' }}><Icons.Location /></span>
+                  <input type="text" placeholder="City, state, or address" value={location} onChange={e => setLocation(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-lg text-sm focus-ring transition-all" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--fg-muted)' }}>Min Price</label>
+                <select value={minPrice} onChange={e => setMinPrice(e.target.value)} className="w-full px-4 py-3 rounded-lg text-sm focus-ring transition-all appearance-none cursor-pointer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">No min</option><option value="1000">K1,000</option><option value="2000">K2,000</option><option value="3000">K3,000</option><option value="5000">K5,000</option><option value="7500">K7,500</option><option value="10000">K10,000</option></select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--fg-muted)' }}>Max Price</label>
+                <select value={maxPrice} onChange={e => setMaxPrice(e.target.value)} className="w-full px-4 py-3 rounded-lg text-sm focus-ring transition-all appearance-none cursor-pointer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">No max</option><option value="2000">K2,000</option><option value="3000">K3,000</option><option value="5000">K5,000</option><option value="7500">K7,500</option><option value="10000">K10,000</option><option value="15000">K15,000+</option></select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--fg-muted)' }}>Bedrooms</label>
+                <select value={bedrooms} onChange={e => setBedrooms(e.target.value)} className="w-full px-4 py-3 rounded-lg text-sm focus-ring transition-all appearance-none cursor-pointer" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="any">Any</option><option value="0">Studio</option><option value="1">1 Bedroom</option><option value="2">2 Bedrooms</option><option value="3">3 Bedrooms</option><option value="4">4+ Bedrooms</option></select>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col sm:flex-row gap-3 justify-center">
+              <button type="submit" className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}><Icons.Search /> Search Properties</button>
+              {variant === 'results' && <button type="button" onClick={() => { setLocation(''); setMinPrice(''); setMaxPrice(''); setBedrooms('any'); }} className="px-6 py-3.5 rounded-lg font-medium text-sm transition-all hover:opacity-80 focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-secondary)', border: '1px solid var(--border)' }}>Clear Filters</button>}
+            </div>
+          </div>
+        </form>
+      );
+    };
+
+    const PropertyCard = ({ property, index }) => {
+      const { navigateTo } = useApp();
+      const [imageLoaded, setImageLoaded] = useState(false);
+      const formatPrice = (price) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'ZMW', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price);
+      const bedroomLabel = property.bedrooms === 0 ? 'Studio' : `${property.bedrooms} Bed`;
+      return (
+        <article className="group rounded-xl overflow-hidden transition-all duration-300 hover:translate-y-[-4px] animate-fade-in-up cursor-pointer" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', animationDelay: `${index * 0.1}s`, opacity: 0 }} onClick={() => navigateTo('property', property)} tabIndex={0} role="button" aria-label={`View ${property.title}`} onKeyPress={e => e.key === 'Enter' && navigateTo('property', property)}>
+          <div className="relative h-56 overflow-hidden">
+            {!imageLoaded && <div className="absolute inset-0 card-shimmer"></div>}
+            <img src={property.images[0]} alt={property.title} className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setImageLoaded(true)} />
+            {property.featured && <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured</div>}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)' }}></div>
+          </div>
+          <div className="p-5">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="font-display text-lg font-semibold line-clamp-1 group-hover:text-[#c9a55c] transition-colors" style={{ color: 'var(--fg-primary)' }}>{property.title}</h3>
+            </div>
+            <div className="flex items-center gap-1.5 mb-3" style={{ color: 'var(--fg-muted)' }}><Icons.Location /><span className="text-sm">{property.location.city}, {property.location.state}</span></div>
+            <div className="flex items-center gap-4 mb-4 text-sm" style={{ color: 'var(--fg-secondary)' }}>
+              <div className="flex items-center gap-1.5"><Icons.Bed /><span>{bedroomLabel}</span></div>
+              <div className="flex items-center gap-1.5"><Icons.Bath /><span>{property.bathrooms} Bath</span></div>
+              <div className="flex items-center gap-1.5"><Icons.Area /><span>{property.area.toLocaleString()} sqft</span></div>
+            </div>
+            <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+              <div><span className="font-display text-2xl font-bold" style={{ color: 'var(--accent)' }}>{formatPrice(property.price)}</span><span className="text-sm ml-1" style={{ color: 'var(--fg-muted)' }}>/mo</span></div>
+              <span className="text-sm font-medium group-hover:underline transition-all" style={{ color: 'var(--accent)' }}>View Details</span>
+            </div>
+          </div>
+        </article>
+      );
+    };
+
+    const Hero = () => {
+      const { navigateTo, setSearchResults, setIsLoading, setLastSearch, properties } = useApp();
+      const [isVisible, setIsVisible] = useState(false);
+      useEffect(() => setIsVisible(true), []);
+
+      const handleSearch = async (filters) => {
+        setIsLoading(true);
+        const results = await api.searchProperties(filters, properties); 
+        setSearchResults(results.data);
+        setLastSearch(filters);
+        setIsLoading(false);
+        navigateTo('search');
+      };
+
+      return (
+        <section className="relative min-h-screen flex items-center justify-center hero-gradient pt-20">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ backgroundColor: 'var(--accent)' }}></div>
+            <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full opacity-10 blur-3xl" style={{ backgroundColor: 'var(--accent)' }}></div>
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div className="text-center mb-12">
+              <h1 className={`font-display text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ color: 'var(--fg-primary)' }}>Find Your Perfect Job<br /><span style={{ color: 'var(--accent)' }}>&Rental Home</span></h1>
+              <p className={`text-lg sm:text-xl max-w-2xl mx-auto transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ color: 'var(--fg-secondary)' }}>Discover thousands of rental properties across the country. From cozy studios to luxury estates, your next home,dream job is waiting.</p>
+            </div>
+            <div className={`transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}><SearchBar variant="hero" onSearch={handleSearch} /></div>
+            <div className={`grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 transition-all duration-700 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              {[{ value: '12K+', label: 'Properties' }, { value: '8K+', label: 'Happy Renters' }, { value: '50+', label: 'Cities' }, { value: '4.9', label: 'Avg Rating' }].map((stat, i) => (
+                <div key={i} className="text-center"><div className="font-display text-3xl sm:text-4xl font-bold mb-1" style={{ color: 'var(--accent)' }}>{stat.value}</div><div className="text-sm" style={{ color: 'var(--fg-muted)' }}>{stat.label}</div></div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+    };
+
+    const FeaturedProperties = () => {
+      const [properties, setProperties] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const { navigateTo } = useApp();
+
+      const { properties: allProperties } = useApp();
+
+      useEffect(() => {
+        const featured = allProperties.filter(p => p.featured && p.available);
+        setProperties(featured);
+        setLoading(false);
+      }, [allProperties]);
+
+      return (
+        <section className="py-24" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-12">
+              <div>
+                <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3" style={{ color: 'var(--fg-primary)' }}>Featured Properties</h2>
+                <p className="text-base" style={{ color: 'var(--fg-secondary)' }}>Hand-picked listings selected for quality and value</p>
+              </div>
+              <button onClick={() => navigateTo('search')} className="mt-4 sm:mt-0 text-sm font-medium flex items-center gap-2 hover:gap-3 transition-all focus-ring rounded px-2 py-1" style={{ color: 'var(--accent)' }}>View All Properties<span className="transform transition-transform">→</span></button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{loading ? Array(4).fill(0).map((_, i) => <PropertySkeleton key={i} />) : properties.slice(0, 4).map((property, i) => <PropertyCard key={property._id} property={property} index={i} />)}</div>
+          </div>
+        </section>
+      );
+    };
+
+    const PropertyDetail = () => {
+      const { selectedProperty, navigateTo, properties } = useApp();
+      const [currentImage, setCurrentImage] = useState(0);
+      const [showContact, setShowContact] = useState(false);
+      const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
+      const [submitStatus, setSubmitStatus] = useState(null);
+      
+      const property = selectedProperty || properties.find(p => p._id === selectedProperty?._id) || properties[0];
+
+      const formatPrice = (price) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'ZMW', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price);
+      const handleContactSubmit = async (e) => { e.preventDefault(); const result = await api.submitContact({ ...contactForm, propertyId: property._id, propertyTitle: property.title }); setSubmitStatus(result); };
+      const bedroomLabel = property.bedrooms === 0 ? 'Studio' : `${property.bedrooms} Bedrooms`;
+
+      if (!property) return <div className="min-h-screen flex items-center justify-center"><p style={{ color: 'var(--fg-muted)' }}>Property not found</p></div>;
+
+      return (
+        <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <button onClick={() => navigateTo('search')} className="flex items-center gap-2 mb-6 text-sm font-medium transition-all hover:gap-3 focus-ring rounded px-2 py-1" style={{ color: 'var(--fg-secondary)' }}><Icons.Arrow /> Back to Results</button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <div className="relative rounded-xl overflow-hidden mb-8 animate-fade-in">
+                  <div className="relative h-[300px] sm:h-[450px]"><img src={property.images[currentImage]} alt={property.title} className="w-full h-full object-cover" /></div>
+                  {property.images.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2">{property.images.map((_, i) => <button key={i} onClick={() => setCurrentImage(i)} className={`flex-1 h-1.5 rounded-full transition-all focus-ring ${i === currentImage ? 'opacity-100' : 'opacity-40 hover:opacity-60'}`} style={{ backgroundColor: 'var(--fg-primary)' }} aria-label={`View image ${i + 1}`} /></div>}
+                  {property.featured && <div className="absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured Listing</div>}
+                </div>
+                <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+                  <h1 className="font-display text-3xl sm:text-4xl font-bold mb-4" style={{ color: 'var(--fg-primary)' }}>{property.title}</h1>
+                  <div className="flex items-center gap-2 mb-6" style={{ color: 'var(--fg-muted)' }}><Icons.Location /><span>{property.location.address}</span><span>•</span><span>{property.location.city}, {property.location.state} {property.location.zipCode}</span></div>
+                  <div className="grid grid-cols-4 gap-4 p-5 rounded-xl mb-8" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                    {[{ icon: <Icons.Bed />, label: bedroomLabel }, { icon: <Icons.Bath />, label: `${property.bathrooms} Bathrooms` }, { icon: <Icons.Area />, label: `${property.area.toLocaleString()} sqft` }, { icon: null, label: property.propertyType.charAt(0).toUpperCase() + property.propertyType.slice(1) }].map((item, i) => <div key={i} className="text-center">{item.icon && <div className="flex justify-center mb-2" style={{ color: 'var(--accent)' }}>{item.icon}</div>}<span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{item.label}</span></div>)}
+                  </div>
+                  <div className="mb-8"><h2 className="font-display text-xl font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>About This Property</h2><p className="leading-relaxed" style={{ color: 'var(--fg-secondary)' }}>{property.description}</p></div>
+                  <div><h2 className="font-display text-xl font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>Amenities</h2><div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{property.amenities.map((amenity, i) => <div key={i} className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}><span style={{ color: 'var(--accent)' }}><Icons.Check /></span><span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{amenity}</span></div>)}</div></div>
+                </div>
+              </div>
+              <div className="lg:col-span-1">
+                <div className="sticky top-28 rounded-xl p-6 animate-slide-in-right" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <div className="mb-6"><span className="font-display text-3xl font-bold" style={{ color: 'var(--accent)' }}>{formatPrice(property.price)}</span><span className="text-base ml-1" style={{ color: 'var(--fg-muted)' }}>/month</span></div>
+                  {!showContact ? <button onClick={() => setShowContact(true)} className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring mb-4" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Contact Property</button> : <form onSubmit={handleContactSubmit} className="space-y-4 mb-4"><input type="text" placeholder="Your Name" required value={contactForm.name} onChange={e => setContactForm({...contactForm, name: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /><input type="email" placeholder="Email Address" required value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /><input type="tel" placeholder="Phone Number" value={contactForm.phone} onChange={e => setContactForm({...contactForm, phone: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /><textarea placeholder="Your Message" rows={3} value={contactForm.message} onChange={e => setContactForm({...contactForm, message: e.target.value})} className="w-full px-4 py-3 rounded-lg text-sm focus-ring resize-none" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}></textarea>{submitStatus && <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: submitStatus.success ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)', color: submitStatus.success ? 'var(--success)' : 'var(--error)' }}>{submitStatus.message || submitStatus.error}</div>}<button type="submit" className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Send Inquiry</button></form>}
+                  <div className="flex items-center justify-center gap-6 pt-4" style={{ borderTop: '1px solid var(--border)' }}><div className="flex items-center gap-2" style={{ color: 'var(--fg-muted)' }}><Icons.Phone /><span className="text-sm">(555) 123-4567</span></div><div className="flex items-center gap-2" style={{ color: 'var(--fg-muted)' }}><Icons.Mail /><span className="text-sm">rentals@homenest.com</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const SearchResults = () => {
+      const { searchResults, setSearchResults, isLoading, setIsLoading, lastSearch, setLastSearch, navigateTo, properties } = useApp();
+      const [hasSearched, setHasSetched] = useState(false);
+      const [showAdvertiseModal, setShowAdvertiseModal] = useState(false);
+
+      const handleSearch = async (filters) => {
+        setIsLoading(true); setHasSearched(true);
+        const results = await api.searchProperties(filters, properties);
+        setSearchResults(results.data); setLastSearch(filters);
+        setIsLoading(false);
+      };
+
+      return (
+        <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
+              <div>
+                <h1 className="font-display text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--fg-primary)' }}>Find Your Rental</h1>
+                <p className="text-base" style={{ color: 'var(--fg-secondary)' }}>Browse properties or list your own house for rent.</p>
+              </div>
+              <button onClick={() => setShowAdvertiseModal(true)} className="px-6 py-3 rounded-lg font-medium text-sm transition-all hover:scale-105 focus-ring flex items-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg> Add Post</button>
+            </div>
+
+            <div className="mb-10"><SearchBar variant="results" onSearch={handleSearch} initialValues={lastSearch || {}} /></div>
+            
+            {isLoading ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{Array(6).fill(0).map((_, i) => <PropertySkeleton key={i} />)}</div> : searchResults.length > 0 ? <><p className="mb-6 text-sm" style={{ color: 'var(--fg-muted)' }}>{searchResults.length} {searchResults.length === 1 ? 'property' : 'properties'} found</p><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{searchResults.map((property, i) => <PropertyCard key={property._id} property={property} index={i} />)}</div></> : hasSearched ? <div className="text-center py-20"><div className="text-6xl mb-4">🏠</div><h3 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--fg-primary)' }}>No Properties Found</h3><p className="mb-6" style={{ color: 'var(--fg-muted)' }}>Try adjusting your search filters to see more results</p><button onClick={() => handleSearch({ location: '', minPrice: '', maxPrice: '', bedrooms: 'any' })} className="px-6 py-3 rounded-lg font-medium text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>View All Properties</button></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{properties.filter(p => p.available).map((property, i) => <PropertyCard key={property._id} property={property} index={i} />)}</div>}
+          </div>
+          {showAdvertiseModal && <AdvertisePropertyModal onClose={() => setShowAdvertiseModal(false)} />}
+        </div>
+      );
+    };
+
+    const AboutPage = () => (
+      <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="font-display text-4xl sm:text-5xl font-bold mb-8 animate-fade-in-up" style={{ color: 'var(--fg-primary)' }}>About HomeNest</h1>
+          <div className="prose prose-lg">
+            <p className="text-lg mb-6 animate-fade-in-up stagger-1" style={{ color: 'var(--fg-secondary)' }}>HomeNest is your trusted partner in finding the perfect rental property. We connect renters with verified properties across the nation, making the search for your next home simple and stress-free.</p>
+            <div className="p-8 rounded-xl my-10 animate-fade-in-up stagger-2" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <h2 className="font-display text-2xl font-semibold mb-6" style={{ color: 'var(--fg-primary)' }}>Our Mission</h2>
+              <p style={{ color: 'var(--fg-secondary)' }}>We believe everyone deserves a place they can call home. Our mission is to transform the rental experience by providing a transparent, efficient, and user-friendly platform that empowers renters to make informed decisions.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 my-10">
+              [{ number: '12K+', label: 'Active Listings' }, { number: '50+', label: 'Cities Covered' }, { number: '8K+', label: 'Happy Renters' }].map((stat, i) => <div key={i} className="text-center p-6 rounded-xl animate-fade-in-up" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', animationDelay: `${0.3 + i * 0.1}s` }}><div className="font-display text-3xl font-bold mb-2" style={{ color: 'var(--accent)' }}>{stat.number}</div><div className="text-sm" style={{ color: 'var(--fg-muted)' }}>{stat.label}</div></div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    const Footer = () => (
+      <footer className="py-16 pb-24 sm:pb-16" style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+            <div>
+              <div className="flex items-center gap-2 mb-4"><div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent)' }}><span className="font-display text-xl font-bold" style={{ color: 'var(--bg-primary)' }}>H</span></div><span className="font-display text-xl font-semibold" style={{ color: 'var(--fg-primary)' }}>HomeNest</span></div>
+              <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Your trusted partner in finding the perfect rental property.</p>
+            </div>
+            {[
+              { title: 'Quick Links', links: ['Search', 'Featured', 'About', 'Jobs'] },
+              { title: 'Property Types', links: ['Apartments', 'Houses', 'Condos', 'Townhouses'] },
+              { title: 'Support', links: ['FAQ', 'Privacy Policy', 'Terms of Service', 'Sitemap'] }
+            ].map((col, i) => (
+              <div key={i}>
+                <h4 className="font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>{col.title}</h4>
+                <ul className="space-y-2">{col.links.map((link, j) => <li key={j}><a href="#" className="text-sm transition-colors hover:underline focus-ring rounded px-1" style={{ color: 'var(--fg-muted)' }}>{link}</a></li>)}</ul>
+              </div>
+            ))}
+          </div>
+          <div className="mt-12 pt-8 text-center text-sm" style={{ borderTop: '1px solid var(--border)', color: 'var(--fg-muted)' }}>© {new Date().getFullYear()} HomeNest. All rights reserved   POWEREDBY: Mtcode.</div>
+        </div>
+      </footer>
+    );
+
+    const MobileNavBar = () => {
+      const { currentPage, navigateTo } = useApp();
+      const activeColor = 'var(--accent)';
+      const inactiveColor = 'var(--fg-muted)';
+      return (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden border-t flex justify-around items-center pt-2 pb-5 sm:pb-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          {[
+            { id: 'home', icon: <Icons.Home />, label: 'Home' },
+            { id: 'search', icon: <Icons.Search />, label: 'Browse' },
+            { id: 'jobs', icon: <Icons.Briefcase />, label: 'Jobs' },
+            { id: 'about', icon: <Icons.Info />, label: 'About' }
+          ].map(item => (
+            <button key={item.id} onClick={() => navigateTo(item.id)} className="flex flex-col items-center gap-1 w-16 focus-ring rounded" aria-label={item.label}>
+              <div style={{ color: currentPage === item.id ? activeColor : inactiveColor }}>{item.icon}</div>
+              <span className="text-[10px] font-medium" style={{ color: currentPage === item.id ? activeColor : inactiveColor }}>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      );
+    };
+
+    const App = () => {
+      const { currentPage } = useApp();
+      return (
+        <div className="min-h-screen flex flex flex-col">
+          <Header />
+          <main className="flex-1">
+            {currentPage === 'home' && (<><Hero /><FeaturedProperties /></>)}
+            {currentPage === 'search' && <SearchResults />}
+            {currentPage === 'property' && <PropertyDetail />}
+            {currentPage === 'about' && <AboutPage />}
+            {currentPage === 'jobs' && <JobsPage />}
+            {currentPage === 'login' && <AdminLogin />}
+            {currentPage === 'admin-dashboard' && <AdminDashboard />}
+          </main>
+          <Footer />
+          <MobileNavBar />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AppProvider><App /></AppProvider>);
+  </script>
+</body>
+</html>
