@@ -477,6 +477,7 @@
       const [lastSearch, setLastSearch] = useState(null);
       const [isLoading, setIsLoading] = useState(true); // Start loading true
       const [currency, setCurrency] = useState('ZMW');
+      const [autoContact, setAutoContact] = useState(false);
 
       // Admin State
       const [adminLoggedIn, setAdminLoggedIn] = useState(() => {
@@ -598,12 +599,12 @@
         refreshData();
       }, [refreshData]);
 
-      const navigateTo = (page, data = null) => {
+      const navigateTo = useCallback((page, data = null, shouldContact = false) => {
         setCurrentPage(page);
-        if (data) setSelectedProperty(data);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      };
-
+        setSelectedProperty(data);
+        if (shouldContact) setAutoContact(true);
+        window.scrollTo(0, 0);
+      }, []);
       const formatPrice = useCallback((priceInZMW) => {
         if (priceInZMW === undefined || priceInZMW === null) return '';
         // If it's a string that doesn't look like a number, return as is (e.g. "Negotiable")
@@ -632,6 +633,7 @@
           navigateTo,
           // Currency
           currency, setCurrency, formatPrice, EXCHANGE_RATES,
+          autoContact, setAutoContact,
           // Admin Props
           adminLoggedIn, setAdminLoggedIn: handleSetAdminLoggedIn,
           properties, setProperties,
@@ -1821,7 +1823,14 @@
             {!imageLoaded && <div className="absolute inset-0 card-shimmer"></div>}
             <img src={property.images[0]} alt={property.title} className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setImageLoaded(true)} />
             {property.featured && <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured</div>}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)' }}></div>
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigateTo('property', property, true); }}
+                className="px-4 py-1.5 rounded-lg font-bold text-xs bg-[var(--accent)] text-[var(--bg-primary)] shadow-xl transform active:scale-95 transition-transform"
+              >
+                Booking
+              </button>
+            </div>
           </div>
           <div className="p-5">
             <div className="flex items-start justify-between mb-2">
@@ -1919,6 +1928,17 @@
       const [currentInquiryId, setCurrentInquiryId] = useState(null);
       const [paymentFlow, setPaymentFlow] = useState('direct'); // 'direct' or 'renting'
 
+      useEffect(() => {
+        if (autoContact) {
+          setShowContact(true);
+          setContactStep('form');
+          setTimeout(() => {
+            document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+          setAutoContact(false);
+        }
+      }, [autoContact, setAutoContact]);
+
       const property = selectedProperty || properties.find(p => p._id === selectedProperty?._id) || properties[0];
 
       const handleContactSubmit = async (e) => {
@@ -1981,6 +2001,13 @@
               <div className="lg:col-span-2">
                 <div className="relative rounded-xl overflow-hidden mb-8 animate-fade-in shadow-xl">
                   <div className="relative h-[250px] sm:h-[450px]"><img src={property.images[currentImage]} alt={property.title} className="w-full h-full object-cover" /></div>
+                  <button
+                    onClick={() => { setShowContact(true); document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' }); }}
+                    className="absolute bottom-10 left-4 px-6 py-2 rounded-lg font-bold text-sm shadow-2xl transition-all hover:scale-110 active:scale-95 z-10 sm:bottom-12"
+                    style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}
+                  >
+                    Booking
+                  </button>
                   {property.images.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2">{property.images.map((_, i) => <button key={i} onClick={() => setCurrentImage(i)} className={`flex-1 h-1.5 rounded-full transition-all focus-ring ${i === currentImage ? 'opacity-100' : 'opacity-40 hover:opacity-60'}`} style={{ backgroundColor: 'var(--fg-primary)' }} aria-label={`View image ${i + 1}`} />)}</div>}
                   {property.featured && <div className="absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured Listing</div>}
                 </div>
@@ -1994,7 +2021,7 @@
                   <div><h2 className="font-display text-xl font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>Amenities</h2><div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{property.amenities.map((amenity, i) => <div key={i} className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}><span style={{ color: 'var(--accent)' }}><Icons.Check /></span><span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{amenity}</span></div>)}</div></div>
                 </div>
               </div>
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1" id="contact-section">
                 <div className="sticky top-28 rounded-xl p-6 animate-slide-in-right" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                   <div className="mb-6"><span className="font-display text-3xl font-bold" style={{ color: 'var(--accent)' }}>{formatPrice(property.price)}</span><span className="text-base ml-1" style={{ color: 'var(--fg-muted)' }}>/month</span></div>
 
