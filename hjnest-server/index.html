@@ -185,7 +185,11 @@
     // ============================================
     // API CONFIGURATION
     // ============================================
-    const API_URL = '/api';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // If local, assume backend is on 5001 (default). If deployed, use relative path.
+    // However, if we are serving FROM the backend (port 5001), relative path '/api' also works.
+    // The issue is likely 'Live Server' (port 5500).
+    const API_URL ='/api';
 
     const simulateLatency = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -557,11 +561,11 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
-        if (username === 'admin' && password === 'adminn20') {
+        if (username === 'admin' && password === 'admin') {
           setAdminLoggedIn(true);
           navigateTo('admin-dashboard');
         } else {
-          setError('Invalid credentials. Try again with correct password');
+          setError('Invalid credentials. Try admin/admin');
         }
       };
 
