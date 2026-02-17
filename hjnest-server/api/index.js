@@ -3,35 +3,72 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
+const path = require('path');
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', message: 'Server is running' });
+});
+
+// Logs for debugging
+app.use((req, res, next) => {
+    console.log(`Request: ${req.method} ${req.url}`);
+    next();
+});
+
 
 // --- 1. FIXED CONNECTION STRING ---
 // Vercel reads this from the Environment Variables dashboard
-const MONGO_URI = process.env.MONGO_URI; 
+const MONGO_URI = process.env.MONGO_URI;
 
 // --- 2. OPTIMIZED CONNECTION FOR VERCEL ---
-// In serverless environments, we check if we are already connected 
-// to avoid creating too many connections.
-if (!MONGO_URI) {
-  console.error('❌ FATAL ERROR: MONGO_URI is not defined in environment variables.');
-} else {
-  mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB'))
-    .catch(err => console.error('❌ MongoDB connection error:', err));
+// Global variable to cache the connection across invocations
+let cached = global.mongoose;
+
+if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function dbConnect() {
+    if (cached.conn) {
+        return cached.conn;
+    }
+
+    if (!cached.promise) {
+        const opts = {
+            bufferCommands: false,
+        };
+
+        cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+            console.log('✅ Connected to MongoDB');
+            return mongoose;
+        });
+    }
+
+    try {
+        cached.conn = await cached.promise;
+    } catch (e) {
+        cached.promise = null;
+        throw e;
+    }
+
+    return cached.conn;
 }
 
 // --- SCHEMAS ---
 
 // 1. Property Schema
 const propertySchema = new mongoose.Schema({
-    title: String, description: String, price: Number, bedrooms: Number, 
+    title: String, description: String, price: Number, bedrooms: Number,
     bathrooms: Number, area: Number, location: {
         address: String, city: String, state: String, zipCode: String, coordinates: Object
     },
-    propertyType: String, images: [String], amenities: [String], 
+    propertyType: String, images: [String], amenities: [String],
     available: { type: Boolean, default: true },
     featured: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
@@ -40,7 +77,7 @@ const propertySchema = new mongoose.Schema({
 // 2. Job Schema
 const jobSchema = new mongoose.Schema({
     title: String, company: String, location: String, salary: String,
-    type: String, description: String, image: String, 
+    type: String, description: String, image: String,
     featured: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
@@ -62,18 +99,30 @@ const pendingJobSchema = new mongoose.Schema({
 // 5. Message Schema (Contact Form)
 const messageSchema = new mongoose.Schema({
     name: String, email: String, phone: String, message: String,
-    propertyId: String, propertyTitle: String, 
+    propertyId: String, propertyTitle: String,
     date: { type: Date, default: Date.now }
 });
 
 // 6. Job Application Schema
 const jobApplicationSchema = new mongoose.Schema({
-    jobId: String, jobTitle: String,
-    applicant: { 
-        names: String, telephone: String, gender: String, 
-        place: String, email: String, age: String, academicLevel: String 
+    jobId: String,
+    applicant: {
+        names: String, telephone: String, gender: String,
+        place: String, email: String, age: String, academicLevel: String
     },
     payment: { provider: String, transactionId: String },
+    status: { type: String, default: 'pending' },
+    date: { type: Date, default: Date.now }
+});
+
+
+// 7. Direct Inquiry Schema (Contact Fee)
+const directInquirySchema = new mongoose.Schema({
+    name: String, email: String, phone: String, message: String,
+    propertyId: String, propertyTitle: String,
+    transactionId: String, provider: String,
+    status: { type: String, default: 'pending' }, // pending, confirmed
+    amount: Number,
     date: { type: Date, default: Date.now }
 });
 
@@ -84,12 +133,14 @@ const PendingAd = mongoose.model('PendingAd', pendingAdSchema);
 const PendingJob = mongoose.model('PendingJob', pendingJobSchema);
 const Message = mongoose.model('Message', messageSchema);
 const JobApplication = mongoose.model('JobApplication', jobApplicationSchema);
+const DirectInquiry = mongoose.model('DirectInquiry', directInquirySchema);
 
 // --- ROUTES ---
 
 // 1. GET Data
 app.get('/api/properties', async (req, res) => {
     try {
+        await dbConnect();
         const data = await Property.find().sort({ createdAt: -1 });
         res.json(data);
     } catch (e) {
@@ -99,6 +150,7 @@ app.get('/api/properties', async (req, res) => {
 
 app.get('/api/jobs', async (req, res) => {
     try {
+        await dbConnect();
         const data = await Job.find().sort({ createdAt: -1 });
         res.json(data);
     } catch (e) {
@@ -108,6 +160,7 @@ app.get('/api/jobs', async (req, res) => {
 
 app.get('/api/pending-ads', async (req, res) => {
     try {
+        await dbConnect();
         const data = await PendingAd.find().sort({ paymentDate: -1 });
         res.json(data);
     } catch (e) {
@@ -117,8 +170,30 @@ app.get('/api/pending-ads', async (req, res) => {
 
 app.get('/api/pending-jobs', async (req, res) => {
     try {
+        await dbConnect();
         const data = await PendingJob.find().sort({ paymentDate: -1 });
         res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/direct-inquiries', async (req, res) => {
+    try {
+        await dbConnect();
+        const data = await DirectInquiry.find().sort({ date: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/direct-inquiries/:id', async (req, res) => {
+    try {
+        await dbConnect();
+        const inquiry = await DirectInquiry.findById(req.params.id);
+        if (!inquiry) return res.status(404).json({ success: false, error: 'Inquiry not found' });
+        res.json(inquiry);
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
@@ -129,6 +204,7 @@ app.get('/api/pending-jobs', async (req, res) => {
 // A. Send Contact Message
 app.post('/api/messages', async (req, res) => {
     try {
+        await dbConnect();
         const newMessage = new Message(req.body);
         await newMessage.save();
         console.log(`📩 NEW MESSAGE from ${req.body.name}: ${req.body.message}`);
@@ -141,6 +217,7 @@ app.post('/api/messages', async (req, res) => {
 // B. Submit Job Application
 app.post('/api/job-applications', async (req, res) => {
     try {
+        await dbConnect();
         const newApp = new JobApplication(req.body);
         await newApp.save();
         console.log(`💼 JOB APPLICATION for "${req.body.jobTitle}" by ${req.body.applicant.names}`);
@@ -153,15 +230,16 @@ app.post('/api/job-applications', async (req, res) => {
 // C. Submit Pending Ad (User submits form)
 app.post('/api/pending-ads', async (req, res) => {
     try {
+        await dbConnect();
         const { _id, ...data } = req.body;
-        
+
         if (data.paymentDate && typeof data.paymentDate === 'string') {
             data.paymentDate = new Date(data.paymentDate);
         }
 
         const newPending = new PendingAd(data);
         await newPending.save();
-        
+
         console.log(`🏠 NEW PROPERTY AD SUBMITTED: ${data.propertyData.title} by ${data.advertiserName}`);
         res.json({ success: true, message: 'Ad submitted for approval' });
     } catch (e) {
@@ -173,19 +251,34 @@ app.post('/api/pending-ads', async (req, res) => {
 // D. Submit Pending Job
 app.post('/api/pending-jobs', async (req, res) => {
     try {
+        await dbConnect();
         const { _id, ...data } = req.body;
-        
+
         if (data.paymentDate && typeof data.paymentDate === 'string') {
             data.paymentDate = new Date(data.paymentDate);
         }
 
         const newPending = new PendingJob(data);
         await newPending.save();
-        
+
         console.log(`💼 NEW JOB AD SUBMITTED: ${data.jobData.title} by ${data.advertiserName}`);
         res.json({ success: true, message: 'Job submitted for approval' });
     } catch (e) {
         console.error("Error saving pending job:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// E. Submit Direct Inquiry (Contact Fee Request)
+app.post('/api/direct-inquiries', async (req, res) => {
+    try {
+        await dbConnect();
+        const newInquiry = new DirectInquiry(req.body);
+        await newInquiry.save();
+        console.log(`💰 NEW DIRECT INQUIRY (Fee Paid): ${req.body.propertyTitle} by ${req.body.name}`);
+        res.json({ success: true, inquiry: newInquiry });
+    } catch (e) {
+        console.error("Inquiry Submission Error:", e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -195,6 +288,7 @@ app.post('/api/pending-jobs', async (req, res) => {
 // A. Create Property (Directly from Dashboard)
 app.post('/api/properties', async (req, res) => {
     try {
+        await dbConnect();
         const newProp = new Property(req.body);
         await newProp.save();
         console.log(`🏠 ADMIN CREATED: ${req.body.title}`);
@@ -207,6 +301,7 @@ app.post('/api/properties', async (req, res) => {
 // B. Delete Property
 app.delete('/api/properties/:id', async (req, res) => {
     try {
+        await dbConnect();
         await Property.findByIdAndDelete(req.params.id);
         console.log(`🗑️ ADMIN DELETED Property ID: ${req.params.id}`);
         res.json({ success: true });
@@ -218,6 +313,7 @@ app.delete('/api/properties/:id', async (req, res) => {
 // C. Approve Ad (Move from Pending to Live)
 app.post('/api/pending-ads/:id/approve', async (req, res) => {
     try {
+        await dbConnect();
         const pending = await PendingAd.findById(req.params.id);
         if (pending) {
             const newPropData = pending.propertyData.toObject();
@@ -226,9 +322,9 @@ app.post('/api/pending-ads/:id/approve', async (req, res) => {
 
             const newProp = new Property(newPropData);
             await newProp.save();
-            
+
             await PendingAd.findByIdAndDelete(req.params.id);
-            
+
             console.log(`✅ ADMIN APPROVED AD: ${newPropData.title}`);
             res.json({ success: true, message: 'Ad Approved' });
         } else {
@@ -243,6 +339,7 @@ app.post('/api/pending-ads/:id/approve', async (req, res) => {
 // D. Approve Job (Move from Pending to Live)
 app.post('/api/pending-jobs/:id/approve', async (req, res) => {
     try {
+        await dbConnect();
         const pending = await PendingJob.findById(req.params.id);
         if (pending) {
             const newJobData = pending.jobData.toObject();
@@ -251,9 +348,9 @@ app.post('/api/pending-jobs/:id/approve', async (req, res) => {
 
             const newJob = new Job(newJobData);
             await newJob.save();
-            
+
             await PendingJob.findByIdAndDelete(req.params.id);
-            
+
             console.log(`✅ ADMIN APPROVED JOB: ${newJobData.title}`);
             res.json({ success: true, message: 'Job Approved' });
         } else {
@@ -265,6 +362,33 @@ app.post('/api/pending-jobs/:id/approve', async (req, res) => {
     }
 });
 
+// E. Confirm Direct Inquiry (Approve Payment)
+app.post('/api/direct-inquiries/:id/approve', async (req, res) => {
+    try {
+        await dbConnect();
+        const inquiry = await DirectInquiry.findById(req.params.id);
+        if (inquiry) {
+            inquiry.status = 'confirmed';
+            await inquiry.save();
+            console.log(`✅ ADMIN CONFIRMED PAYMENT for: ${inquiry.propertyTitle}`);
+            res.json({ success: true, message: 'Payment Confirmed' });
+        } else {
+            res.status(404).json({ success: false, error: 'Inquiry not found' });
+        }
+    } catch (error) {
+        console.error("Direct Inquiry Approval Error:", error);
+        res.status(500).json({ success: false, error: 'Failed to approve payment' });
+    }
+});
+
 // --- 3. CRITICAL: EXPORT APP FOR VERCEL ---
-// Do NOT use app.listen() here. Vercel handles the server startup.
+// Vercel handles the server startup.
 module.exports = app;
+
+// --- 4. LOCAL DEVELOPMENT ---
+if (require.main === module) {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server running locally on http://localhost:${PORT}`);
+    });
+}
