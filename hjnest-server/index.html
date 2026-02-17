@@ -934,7 +934,9 @@
             coordinates: {}
           },
           propertyType: formData.propertyType,
-          images: [formData.image || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'],
+          images: formData.images && formData.images.filter(img => img).length > 0
+            ? formData.images.filter(img => img)
+            : ['https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800', 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800', 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'],
           amenities: ['Parking', 'Security'], // Default
           available: true,
           featured: false,
