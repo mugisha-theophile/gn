@@ -920,10 +920,10 @@
               {/* TAB 1: Pending Approvals (Properties) */}
               {activeTab === 'ads' && (
                 <div className="space-y-4">
-                  {pendingAds.length === 0 ? (
+                  {(pendingAds || []).length === 0 ? (
                     <div className="text-center py-10" style={{ color: 'var(--fg-muted)' }}>No pending approvals.</div>
                   ) : (
-                    pendingAds.map(req => (
+                    (pendingAds || []).map(req => (
                       <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                         <div className="flex-1">
                           <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{req.propertyData.title}</h3>
@@ -953,10 +953,10 @@
               {/* TAB 2: Pending Job Approvals */}
               {activeTab === 'pending-jobs' && (
                 <div className="space-y-4">
-                  {pendingJobs.length === 0 ? (
+                  {(pendingJobs || []).length === 0 ? (
                     <div className="text-center py-10" style={{ color: 'var(--fg-muted)' }}>No pending job approvals.</div>
                   ) : (
-                    pendingJobs.map(req => (
+                    (pendingJobs || []).map(req => (
                       <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                         <div className="flex-1">
                           <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{req.jobData.title}</h3>
@@ -986,10 +986,10 @@
               {/* TAB: Contact Fees */}
               {activeTab === 'contact-fees' && (
                 <div className="space-y-4">
-                  {directInquiries.length === 0 ? (
+                  {(directInquiries || []).length === 0 ? (
                     <div className="text-center py-10" style={{ color: 'var(--fg-muted)' }}>No contact fee requests.</div>
                   ) : (
-                    directInquiries.map(req => (
+                    (directInquiries || []).map(req => (
                       <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                         <div className="flex-1">
                           <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>Contact for: {req.propertyTitle}</h3>
@@ -1821,7 +1821,7 @@
             {!imageLoaded && <div className="absolute inset-0 card-shimmer"></div>}
             <img src={property.images[0]} alt={property.title} className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setImageLoaded(true)} />
             {property.featured && <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured</div>}
-            <div className={`absolute inset-0 transition-opacity flex items-end p-4 ${window.innerWidth < 640 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }}>
+            <div className="absolute inset-0 transition-opacity flex items-end p-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }}>
               <button
                 onClick={(e) => { e.stopPropagation(); navigateTo('property', property, true); }}
                 className="px-4 py-1.5 rounded-lg font-bold text-xs bg-[var(--accent)] text-[var(--bg-primary)] shadow-xl transform active:scale-95 transition-transform"
