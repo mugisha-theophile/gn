@@ -834,7 +834,7 @@
       // Form state for Create/Edit
       const [formData, setFormData] = useState({
         title: '', description: '', price: '', bedrooms: '', bathrooms: '', area: '',
-        city: '', state: '', address: '', propertyType: 'apartment', image: ''
+        city: '', state: '', address: '', propertyType: 'apartment', images: ['', '', '']
       });
 
       // Blog form state
@@ -847,7 +847,7 @@
       const resetForm = () => {
         setFormData({
           title: '', description: '', price: '', bedrooms: '', bathrooms: '', area: '',
-          city: '', state: '', address: '', propertyType: 'apartment', image: ''
+          city: '', state: '', address: '', propertyType: 'apartment', images: ['', '', '']
         });
         setEditingProperty(null);
         setEditingBlog(null);
@@ -869,7 +869,7 @@
           state: prop.location.state,
           address: prop.location.address,
           propertyType: prop.propertyType,
-          image: prop.images[0]
+          images: prop.images && prop.images.length >= 3 ? prop.images : [prop.images?.[0] || '', prop.images?.[1] || '', prop.images?.[2] || '']
         });
         setActiveTab('create'); // Switch to form view
       };
@@ -1245,32 +1245,43 @@
                     <input required value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)]" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Property Image</label>
-                    <div className="flex flex-col gap-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            const compressed = await compressImage(file);
-                            setFormData({ ...formData, image: compressed });
-                          }
-                        }}
-                        className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)] text-sm"
-                      />
-                      {formData.image && (
-                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--border)]">
-                          <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, image: '' })}
-                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg hover:bg-red-600 transition-colors"
-                          >
-                            <Icons.Close />
-                          </button>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Property Images (3 Required)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[0, 1, 2].map((index) => (
+                        <div key={index} className="flex flex-col gap-2">
+                          <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>Image {index + 1} {index === 0 ? '(Main)' : ''}</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const compressed = await compressImage(file);
+                                const newImages = [...formData.images];
+                                newImages[index] = compressed;
+                                setFormData({ ...formData, images: newImages });
+                              }
+                            }}
+                            className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--fg-primary)] text-sm"
+                          />
+                          {formData.images[index] && (
+                            <div className="relative w-full h-24 rounded-lg overflow-hidden border border-[var(--border)]">
+                              <img src={formData.images[index]} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newImages = [...formData.images];
+                                  newImages[index] = '';
+                                  setFormData({ ...formData, images: newImages });
+                                }}
+                                className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg hover:bg-red-600 transition-colors"
+                              >
+                                <Icons.Close />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                   <div>
@@ -2143,6 +2154,8 @@
       const [isVerifying, setIsVerifying] = useState(false);
       const [currentInquiryId, setCurrentInquiryId] = useState(null);
       const [paymentFlow, setPaymentFlow] = useState('direct'); // 'direct' or 'renting'
+      const [showLightbox, setShowLightbox] = useState(false);
+      const [lightboxImage, setLightboxImage] = useState(0);
 
       useEffect(() => {
         if (autoContact) {
@@ -2210,24 +2223,80 @@
 
       if (!property) return <div className="min-h-screen flex items-center justify-center"><p style={{ color: 'var(--fg-muted)' }}>Property not found</p></div>;
 
+      const propertyImages = property.images && property.images.length >= 3 ? property.images : [property.images?.[0] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800', property.images?.[1] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800', property.images?.[2] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'];
+
       return (
         <div className="min-h-screen pt-24 pb-16" style={{ backgroundColor: 'var(--bg-primary)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <button onClick={() => navigateTo('search')} className="flex items-center gap-2 mb-6 text-sm font-medium transition-all hover:gap-3 focus-ring rounded px-2 py-1" style={{ color: 'var(--fg-secondary)' }}><Icons.Arrow /> Back to Results</button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
+                {/* Photo Gallery */}
                 <div className="relative rounded-xl overflow-hidden mb-8 animate-fade-in shadow-xl">
-                  <div className="relative h-[250px] sm:h-[450px]"><img src={property.images[currentImage]} alt={property.title} className="w-full h-full object-cover" /></div>
+                  <div className="grid grid-cols-3 gap-2 h-[300px] sm:h-[450px]">
+                    {/* Main Photo - Takes 2 columns */}
+                    <div className="col-span-2 relative cursor-pointer group" onClick={() => { setLightboxImage(0); setShowLightbox(true); }}>
+                      <img src={propertyImages[0]} alt={property.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <svg className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                        </svg>
+                      </div>
+                    </div>
+                    {/* Side Photos - Stacked */}
+                    <div className="col-span-1 flex flex-col gap-2">
+                      <div className="flex-1 relative cursor-pointer group" onClick={() => { setLightboxImage(1); setShowLightbox(true); }}>
+                        <img src={propertyImages[1]} alt={`${property.title} - Photo 2`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1 relative cursor-pointer group" onClick={() => { setLightboxImage(2); setShowLightbox(true); }}>
+                        <img src={propertyImages[2]} alt={`${property.title} - Photo 3`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <button
                     onClick={() => { setShowContact(true); document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className="absolute bottom-10 left-4 px-6 py-2 rounded-lg font-bold text-sm shadow-2xl transition-all hover:scale-110 active:scale-95 z-10 sm:bottom-12"
+                    className="absolute bottom-4 left-4 px-6 py-2 rounded-lg font-bold text-sm shadow-2xl transition-all hover:scale-110 active:scale-95 z-10"
                     style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}
                   >
                     Booking
                   </button>
-                  {property.images.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2">{property.images.map((_, i) => <button key={i} onClick={() => setCurrentImage(i)} className={`flex-1 h-1.5 rounded-full transition-all focus-ring ${i === currentImage ? 'opacity-100' : 'opacity-40 hover:opacity-60'}`} style={{ backgroundColor: 'var(--fg-primary)' }} aria-label={`View image ${i + 1}`} />)}</div>}
                   {property.featured && <div className="absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured Listing</div>}
                 </div>
+
+                {/* Lightbox Modal */}
+                {showLightbox && (
+                  <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setShowLightbox(false)}>
+                    <button onClick={() => setShowLightbox(false)} className="absolute top-4 right-4 text-white hover:text-[var(--accent)] transition-colors">
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <div className="max-w-5xl w-full">
+                      <img src={propertyImages[lightboxImage]} alt={property.title} className="w-full h-auto max-h-[90vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+                      <div className="flex justify-center gap-4 mt-4">
+                        {propertyImages.map((img, idx) => (
+                          <button
+                            key={idx}
+                            onClick={(e) => { e.stopPropagation(); setLightboxImage(idx); }}
+                            className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${idx === lightboxImage ? 'border-[var(--accent)] scale-110' : 'border-white/30 hover:border-white/60'}`}
+                          >
+                            <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                   <h1 className="font-display text-3xl sm:text-4xl font-bold mb-4" style={{ color: 'var(--fg-primary)' }}>{property.title}</h1>
                   <div className="flex items-center gap-2 mb-6" style={{ color: 'var(--fg-muted)' }}><Icons.Location /><span>{property.location.address}</span><span>•</span><span>{property.location.city}, {property.location.state} {property.location.zipCode}</span></div>
@@ -2253,22 +2322,19 @@
                           <input type="tel" placeholder="Phone Number" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} />
                           <textarea placeholder="Your Message" rows={3} value={contactForm.message} onChange={e => setContactForm({ ...contactForm, message: e.target.value })} className="w-full px-4 py-3 rounded-lg text-sm focus-ring resize-none" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}></textarea>
                           {submitStatus && <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: submitStatus.success ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)', color: submitStatus.success ? 'var(--success)' : 'var(--error)' }}>{submitStatus.message || submitStatus.error}</div>}
-                          <button type="submit" className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Send Inquiry</button>
 
-                          <div className="relative py-4 flex items-center">
-                            <div className="flex-grow border-t border-[var(--border)]"></div>
-                            <span className="flex-shrink mx-4 text-xs font-bold uppercase" style={{ color: 'var(--fg-muted)' }}>OR</span>
-                            <div className="flex-grow border-t border-[var(--border)]"></div>
+                          {/* Buttons on same line */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button type="submit" className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Send Inquiry</button>
+                            <button
+                              type="button"
+                              onClick={() => { setPaymentFlow('direct'); setContactStep('payment'); }}
+                              className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring border-2 border-[var(--accent)]"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              Talk to us directly
+                            </button>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => { setPaymentFlow('direct'); setContactStep('payment'); }}
-                            className="w-full py-4 rounded-lg font-semibold text-sm transition-all hover:scale-105 focus-ring border-2 border-[var(--accent)]"
-                            style={{ color: 'var(--accent)' }}
-                          >
-                            Talk to us directly
-                          </button>
                         </form>
                       )}
 
