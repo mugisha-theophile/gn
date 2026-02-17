@@ -126,6 +126,17 @@ const directInquirySchema = new mongoose.Schema({
     date: { type: Date, default: Date.now }
 });
 
+// 8. Blog Schema
+const blogSchema = new mongoose.Schema({
+    title: String,
+    category: String,
+    content: String,
+    excerpt: String,
+    image: String,
+    date: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now }
+});
+
 // Create Models
 const Property = mongoose.model('Property', propertySchema);
 const Job = mongoose.model('Job', jobSchema);
@@ -134,10 +145,20 @@ const PendingJob = mongoose.model('PendingJob', pendingJobSchema);
 const Message = mongoose.model('Message', messageSchema);
 const JobApplication = mongoose.model('JobApplication', jobApplicationSchema);
 const DirectInquiry = mongoose.model('DirectInquiry', directInquirySchema);
+const Blog = mongoose.model('Blog', blogSchema);
 
 // --- ROUTES ---
 
 // 1. GET Data
+app.get('/api/blogs', async (req, res) => {
+    try {
+        await dbConnect();
+        const data = await Blog.find().sort({ date: -1 });
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 app.get('/api/properties', async (req, res) => {
     try {
         await dbConnect();
@@ -378,6 +399,41 @@ app.post('/api/direct-inquiries/:id/approve', async (req, res) => {
     } catch (error) {
         console.error("Direct Inquiry Approval Error:", error);
         res.status(500).json({ success: false, error: 'Failed to approve payment' });
+    }
+});
+
+// F. Blog Management (Admin)
+app.post('/api/blogs', async (req, res) => {
+    try {
+        await dbConnect();
+        const newBlog = new Blog(req.body);
+        await newBlog.save();
+        console.log(`📝 ADMIN CREATED BLOG: ${req.body.title}`);
+        res.json({ success: true, message: 'Blog post created' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.put('/api/blogs/:id', async (req, res) => {
+    try {
+        await dbConnect();
+        await Blog.findByIdAndUpdate(req.params.id, req.body);
+        console.log(`📝 ADMIN UPDATED BLOG ID: ${req.params.id}`);
+        res.json({ success: true, message: 'Blog post updated' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.delete('/api/blogs/:id', async (req, res) => {
+    try {
+        await dbConnect();
+        await Blog.findByIdAndDelete(req.params.id);
+        console.log(`🗑️ ADMIN DELETED BLOG ID: ${req.params.id}`);
+        res.json({ success: true, message: 'Blog post deleted' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
