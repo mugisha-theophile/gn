@@ -2224,7 +2224,7 @@
                     <p className="text-sm" style={{ color: 'var(--fg-secondary)' }}>
                       {sub.status === 'confirmed'
                         ? (sub.type === 'inquiry'
-                          ? 'Your rent/contact request has been confirmed! You can now see the full property details.'
+                          ? (<span>Your inquiry is confirmed! Call us at <strong style={{ color: 'var(--accent)' }}>0976 123 456</strong> or return to the property page to view details.</span>)
                           : `Your ${sub.type} submission has been approved and is now live on the platform!`)
                         : `Your ${sub.type} submission is currently being reviewed by our team.`}
                     </p>
