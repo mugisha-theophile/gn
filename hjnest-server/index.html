@@ -1001,7 +1001,7 @@
                             <p><span className="font-medium text-[var(--fg-primary)]">Email:</span> {req.email}</p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Trans ID:</span> {req.transactionId}</p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Amount:</span> <span className="font-bold" style={{ color: 'var(--accent)' }}>{formatPrice(req.amount || 0)}</span></p>
-                            <p><span className="font-medium text-[var(--fg-primary)]">Provider:</span> {req.provider.toUpperCase()}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Provider:</span> {(req.provider || '').toUpperCase()}</p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Status:</span> <span style={{ color: req.status === 'confirmed' ? 'var(--success)' : 'var(--warning)' }}>{req.status}</span></p>
                             {req.message && <p className="col-span-2 mt-2 p-2 rounded bg-black/20 italic" style={{ color: 'var(--fg-secondary)' }}><span className="font-bold text-[var(--fg-primary)] not-italic">Message:</span> {req.message}</p>}
                           </div>
@@ -1917,7 +1917,7 @@
     };
 
     const PropertyDetail = () => {
-      const { selectedProperty, navigateTo, properties, formatPrice, trackSubmission } = useApp();
+      const { selectedProperty, navigateTo, properties, formatPrice, trackSubmission, autoContact, setAutoContact } = useApp();
       const [currentImage, setCurrentImage] = useState(0);
       const [showContact, setShowContact] = useState(false);
       const [contactStep, setContactStep] = useState('form'); // 'form', 'payment', 'pending', 'paid'
@@ -2015,7 +2015,7 @@
                   <h1 className="font-display text-3xl sm:text-4xl font-bold mb-4" style={{ color: 'var(--fg-primary)' }}>{property.title}</h1>
                   <div className="flex items-center gap-2 mb-6" style={{ color: 'var(--fg-muted)' }}><Icons.Location /><span>{property.location.address}</span><span>•</span><span>{property.location.city}, {property.location.state} {property.location.zipCode}</span></div>
                   <div className="grid grid-cols-4 gap-4 p-5 rounded-xl mb-8" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    {[{ icon: <Icons.Bed />, label: bedroomLabel }, { icon: <Icons.Bath />, label: `${property.bathrooms} Bathrooms` }, { icon: <Icons.Area />, label: `${property.area.toLocaleString()} sqft` }, { icon: null, label: property.propertyType.charAt(0).toUpperCase() + property.propertyType.slice(1) }].map((item, i) => <div key={i} className="text-center">{item.icon && <div className="flex justify-center mb-2" style={{ color: 'var(--accent)' }}>{item.icon}</div>}<span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{item.label}</span></div>)}
+                    {[{ icon: <Icons.Bed />, label: bedroomLabel }, { icon: <Icons.Bath />, label: `${property.bathrooms} Bathrooms` }, { icon: <Icons.Area />, label: `${property.area.toLocaleString()} sqft` }, { icon: null, label: (property.propertyType || 'Property').charAt(0).toUpperCase() + (property.propertyType || '').slice(1) }].map((item, i) => <div key={i} className="text-center">{item.icon && <div className="flex justify-center mb-2" style={{ color: 'var(--accent)' }}>{item.icon}</div>}<span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{item.label}</span></div>)}
                   </div>
                   <div className="mb-8"><h2 className="font-display text-xl font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>About This Property</h2><p className="leading-relaxed" style={{ color: 'var(--fg-secondary)' }}>{property.description}</p></div>
                   <div><h2 className="font-display text-xl font-semibold mb-4" style={{ color: 'var(--fg-primary)' }}>Amenities</h2><div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{property.amenities.map((amenity, i) => <div key={i} className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}><span style={{ color: 'var(--accent)' }}><Icons.Check /></span><span className="text-sm" style={{ color: 'var(--fg-secondary)' }}>{amenity}</span></div>)}</div></div>
