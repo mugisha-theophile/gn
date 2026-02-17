@@ -22,10 +22,8 @@
       --fg-primary: #f5f5f5;
       --fg-secondary: #a0a0a0;
       --fg-muted: #6b6b6b;
-      --accen: #c9a55c;
-      --accent-hover: #BBCB2E;
-      --accent-hove: #dbb86e;
-      --accent: #839705;
+      --accent: #c9a55c;
+      --accent-hover: #dbb86e;
       --border: #333333;
       --error: #f87171;
       --warning: #fbbf24;
@@ -894,10 +892,10 @@
             {/* Tabs */}
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
               {[
-                { id: 'ads', label: `Prop. Ads (${pendingAds.length})` },
-                { id: 'pending-jobs', label: `Job Ads (${pendingJobs.length})` },
-                { id: 'contact-fees', label: `Contact Fees (${directInquiries.filter(i => i.status === 'pending').length})` },
-                { id: 'manage', label: `Manage Posts (${properties.length})` },
+                { id: 'ads', label: `Prop. Ads (${(pendingAds || []).length})` },
+                { id: 'pending-jobs', label: `Job Ads (${(pendingJobs || []).length})` },
+                { id: 'contact-fees', label: `Contact Fees (${(directInquiries || []).filter(i => i.status === 'pending').length})` },
+                { id: 'manage', label: `Manage Posts (${(properties || []).length})` },
                 { id: 'create', label: editingProperty ? 'Edit Post' : 'Add New Post' }
               ].map(tab => (
                 <button
@@ -1823,7 +1821,7 @@
             {!imageLoaded && <div className="absolute inset-0 card-shimmer"></div>}
             <img src={property.images[0]} alt={property.title} className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setImageLoaded(true)} />
             {property.featured && <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-primary)' }}>Featured</div>}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }}>
+            <div className={`absolute inset-0 transition-opacity flex items-end p-4 ${window.innerWidth < 640 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }}>
               <button
                 onClick={(e) => { e.stopPropagation(); navigateTo('property', property, true); }}
                 className="px-4 py-1.5 rounded-lg font-bold text-xs bg-[var(--accent)] text-[var(--bg-primary)] shadow-xl transform active:scale-95 transition-transform"
