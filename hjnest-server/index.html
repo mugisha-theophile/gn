@@ -578,7 +578,7 @@
             const stillPending = pendingJobs.some(j => j._id === sub.id);
             const inLive = jobs.some(j => j.title === sub.title);
             if (!stillPending && inLive) isConfirmed = true;
-          } else if (sub.type === 'inquiry') {
+          } else if (sub.type === 'inquiry' || sub.type === 'booking' || sub.type === 'contact') {
             const inquiry = directInquiries.find(i => i._id === sub.id);
             if (inquiry && inquiry.status === 'confirmed') isConfirmed = true;
           }
@@ -994,7 +994,7 @@
               {[
                 { id: 'ads', label: `Prop. Ads (${(pendingAds || []).length})` },
                 { id: 'pending-jobs', label: `Job Ads (${(pendingJobs || []).length})` },
-                { id: 'contact-fees', label: `Contact Fees (${(directInquiries || []).filter(i => i.status === 'pending').length})` },
+                { id: 'contact-fees', label: `Bookings & Fees (${(directInquiries || []).filter(i => i.status === 'pending').length})` },
                 { id: 'manage', label: `Manage Posts (${(properties || []).length})` },
                 { id: 'manage-blogs', label: `Blogs (${(blogs || []).length})` },
                 { id: 'create', label: editingProperty ? 'Edit Post' : 'Add New Post' },
@@ -1094,15 +1094,26 @@
                     (directInquiries || []).map(req => (
                       <div key={req._id} className="p-4 rounded-lg flex flex-col md:flex-row gap-4 justify-between items-start md:items-center" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                         <div className="flex-1">
-                          <h3 className="font-bold text-lg" style={{ color: 'var(--accent)' }}>Contact for: {req.propertyTitle}</h3>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" style={{
+                              backgroundColor: req.type === 'booking' ? 'var(--accent)' : 'var(--bg-card)',
+                              color: req.type === 'booking' ? 'var(--bg-primary)' : 'var(--fg-secondary)',
+                              border: req.type === 'booking' ? 'none' : '1px solid var(--border)'
+                            }}>
+                              {req.type === 'booking' ? '🏠 House Booking' : '📞 Contact Info Request'}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-lg" style={{ color: 'var(--fg-primary)' }}>
+                            {req.type === 'booking' ? 'Booking' : 'Inquiry'} for: {req.propertyTitle}
+                          </h3>
                           <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-2 text-sm" style={{ color: 'var(--fg-secondary)' }}>
                             <p><span className="font-medium text-[var(--fg-primary)]">User:</span> {req.name}</p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Phone:</span> {req.phone}</p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Email:</span> {req.email}</p>
-                            <p><span className="font-medium text-[var(--fg-primary)]">Trans ID:</span> {req.transactionId}</p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Trans ID:</span> <span className="font-mono font-bold" style={{ color: 'var(--accent)' }}>{req.transactionId}</span></p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Amount:</span> <span className="font-bold" style={{ color: 'var(--accent)' }}>{formatPrice(req.amount || 0)}</span></p>
                             <p><span className="font-medium text-[var(--fg-primary)]">Provider:</span> {(req.provider || '').toUpperCase()}</p>
-                            <p><span className="font-medium text-[var(--fg-primary)]">Status:</span> <span style={{ color: req.status === 'confirmed' ? 'var(--success)' : 'var(--warning)' }}>{req.status}</span></p>
+                            <p><span className="font-medium text-[var(--fg-primary)]">Status:</span> <span className="capitalize" style={{ color: req.status === 'confirmed' ? 'var(--success)' : 'var(--warning)' }}>{req.status}</span></p>
                             {req.message && <p className="col-span-2 mt-2 p-2 rounded bg-black/20 italic" style={{ color: 'var(--fg-secondary)' }}><span className="font-bold text-[var(--fg-primary)] not-italic">Message:</span> {req.message}</p>}
                           </div>
                         </div>
@@ -1110,7 +1121,8 @@
                           <div className="flex gap-3 w-full md:w-auto">
                             <button
                               onClick={async () => {
-                                if (window.confirm('Confirm this contact fee payment?')) {
+                                const actionType = req.type === 'booking' ? 'House Booking' : 'Payment';
+                                if (window.confirm(`Confirm this ${actionType}?`)) {
                                   const res = await api.approveDirectInquiry(req._id);
                                   if (res.success) {
                                     alert('Payment Confirmed!');
@@ -2164,13 +2176,14 @@
           propertyTitle: property.title,
           transactionId: payment.transactionId,
           provider: payment.provider,
-          amount: paymentFlow === 'renting' ? property.price : 10
+          amount: paymentFlow === 'renting' ? property.price : 10,
+          type: paymentFlow === 'renting' ? 'booking' : 'contact'
         };
 
         const res = await api.submitDirectInquiry(payload);
         if (res.success) {
           setCurrentInquiryId(res.inquiry._id);
-          trackSubmission(res.inquiry._id, 'inquiry', property.title);
+          trackSubmission(res.inquiry._id, payload.type, property.title);
           setContactStep('pending');
         } else {
           alert('Failed to submit: ' + (res.error || 'Server error'));
@@ -2516,9 +2529,11 @@
                     <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--fg-primary)' }}>{sub.title}</h3>
                     <p className="text-sm" style={{ color: 'var(--fg-secondary)' }}>
                       {sub.status === 'confirmed'
-                        ? (sub.type === 'inquiry'
-                          ? (<span>Your inquiry is confirmed! Call us at <strong style={{ color: 'var(--accent)' }}>0976 123 456</strong> or return to the property page to view details.</span>)
-                          : `Your ${sub.type} submission has been approved and is now live on the platform!`)
+                        ? (sub.type === 'booking'
+                          ? (<span>Your booking for <strong>{sub.title}</strong> is confirmed! You have rented this house for this month. Call us at <strong style={{ color: 'var(--accent)' }}>0976 123 456</strong>.</span>)
+                          : (sub.type === 'contact' || sub.type === 'inquiry')
+                            ? (<span>Your inquiry for <strong>{sub.title}</strong> is confirmed! Call us at <strong style={{ color: 'var(--accent)' }}>0976 123 456</strong> to proceed.</span>)
+                            : `Your ${sub.type} submission has been approved and is now live on the platform!`)
                         : `Your ${sub.type} submission is currently being reviewed by our team.`}
                     </p>
                     {sub.status === 'confirmed' && !sub.notified && (

@@ -123,6 +123,7 @@ const directInquirySchema = new mongoose.Schema({
     transactionId: String, provider: String,
     status: { type: String, default: 'pending' }, // pending, confirmed
     amount: Number,
+    type: { type: String, default: 'contact' }, // 'contact', 'booking'
     date: { type: Date, default: Date.now }
 });
 
