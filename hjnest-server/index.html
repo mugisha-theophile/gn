@@ -1610,7 +1610,7 @@
               <nav className="hidden md:flex items-center gap-8">
                 <button onClick={() => navigateTo('home')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'home' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Home</button>
                 <button onClick={() => navigateTo('search')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'search' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Browse</button>
-                <button onClick={() => navigateTo('about')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'about' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>About</button>
+                <button onClick={() => navigateTo('about')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'about' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>AboutUs</button>
                 <button onClick={() => navigateTo('jobs')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'jobs' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Jobs</button>
                 <button onClick={() => navigateTo('blog')} className={`text-sm font-medium transition-colors hover:opacity-80 focus-ring rounded px-2 py-1 ${currentPage === 'blog' ? 'text-[var(--accent)]' : 'text-[var(--fg-secondary)]'}`}>Blog</button>
               </nav>
@@ -1795,7 +1795,7 @@
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Gender</label><select required name="gender" value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Academic Level</label><select required name="academicLevel" value={formData.academicLevel} onChange={e => setFormData({ ...formData, academicLevel: e.target.value })} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">Select</option><option value="Grade 12">Grade 12</option><option value="Degree">Degree</option></select></div>
+                    <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Academic Level</label><select required name="academicLevel" value={formData.academicLevel} onChange={e => setFormData({ ...formData, academicLevel: e.target.value })} className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }}><option value="">Select</option><option value="Secondary">Secondary</option><option value="Degree">Degree</option><option value="Other">Other</option></select></div>
                   </div>
                   <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Place/Location</label><input required name="place" value={formData.place} onChange={e => setFormData({ ...formData, place: e.target.value })} type="text" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
                   <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--fg-secondary)' }}>Email Address</label><input required name="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} type="email" className="w-full px-4 py-3 rounded-lg text-sm focus-ring" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: '1px solid var(--border)' }} /></div>
@@ -2704,3 +2704,4 @@
 </body>
 
 </html>
+
