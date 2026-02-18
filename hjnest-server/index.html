@@ -498,7 +498,7 @@
       KES: { rate: 4.9, symbol: 'KSh' },
       RWF: { rate: 52, symbol: 'RF' },
       TZS: { rate: 100, symbol: 'TSh' },
-      CDF: { rate: 106, symbol: 'FC' }
+      CDF: { rate: 105, symbol: 'FC' }
     };
 
     const AppProvider = ({ children }) => {
@@ -507,7 +507,7 @@
       const [searchResults, setSearchResults] = useState([]);
       const [lastSearch, setLastSearch] = useState(null);
       const [isLoading, setIsLoading] = useState(true); // Start loading true
-      const [currency, setCurrency] = useState('USD');
+      const [currency, setCurrency] = useState('ZMW');
       const [autoContact, setAutoContact] = useState(false);
 
       // Admin State
@@ -2704,5 +2704,3 @@
 </body>
 
 </html>
-
-
